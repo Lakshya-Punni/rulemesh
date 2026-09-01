@@ -2,13 +2,32 @@
 
 Owned primarily by Person A.
 
-Planned components:
+## Run locally
 
-- FastAPI application
+From this directory:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+API documentation is available at `http://localhost:8000/docs`.
+
+Run tests with:
+
+```powershell
+pytest
+```
+
+## Implemented vertical slice
+
 - Typed rule and environment schemas
-- Active-proposal execution engine
-- NetworkX dependency graph and cycle detection
-- Priority-based conflict arbitration
-- WebSocket state broadcasting
-- Pytest unit and integration tests
-
+- Active-proposal full-graph recomputation
+- NetworkX dependency graph and exact cycle-path rejection
+- Priority-based conflict arbitration with visible proposals
+- In-memory authoritative state
+- Environment and rule-creation APIs
+- Live WebSocket snapshots
+- Backend tests for chains, retraction, conflicts, cycles, health, and WebSockets
