@@ -51,8 +51,46 @@ export function RuleForm({ onSubmit, lastRejectionMessage, knownKeys, commandsBu
     setName("");
   }
 
+  function loadValidPreset() {
+    setName("Temperature ventilation override");
+    setPriority(60);
+    setVariable("laboratory.temperature");
+    setOperator(">");
+    setCondValue("35");
+    setTarget("laboratory.hvac");
+    setActionValue("ventilate");
+    setLocalError(null);
+  }
+
+  function loadCyclePreset() {
+    setName("Unsafe evacuation feedback loop");
+    setPriority(100);
+    setVariable("building.evacuation");
+    setOperator("==");
+    setCondValue("true");
+    setTarget("laboratory.alarm");
+    setActionValue("true");
+    setLocalError(null);
+  }
+
   return (
     <form className="rule-form" onSubmit={handleSubmit}>
+      <div className="rule-form__presets">
+        <div className="rule-form__presets-heading">
+          <span>Judge-ready rule tests</span>
+          <span>prefill only</span>
+        </div>
+        <div className="rule-form__presets-actions">
+          <button type="button" className="btn btn--ghost btn--small" onClick={loadValidPreset} disabled={commandsBusy}>
+            Valid live override
+          </button>
+          <button type="button" className="btn btn--danger btn--small" onClick={loadCyclePreset} disabled={commandsBusy}>
+            Unsafe cycle
+          </button>
+        </div>
+        <div className="rule-form__presets-note">Inspect the generated rule, then press Add rule to use the real API.</div>
+      </div>
+
       <div className="rule-form__row">
         <label htmlFor="rule-name">Rule name</label>
         <input id="rule-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Lobby smoke -> alarm" />

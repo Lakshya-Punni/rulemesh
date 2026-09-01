@@ -67,6 +67,13 @@ for the simulator:
 Each stage is one atomic backend revision, stops any running simulation, and is
 broadcast to every live dashboard.
 
+The rule builder also includes two **prefill-only** judge tests. **Valid live
+override** creates a priority-60 ventilation policy that can beat normal
+temperature cooling. **Unsafe cycle** proposes an evacuation-to-alarm feedback
+edge; the backend returns the exact cycle path and leaves the seven-rule graph
+unchanged. The complete timed talk track is in
+[`docs/demo-script.md`](docs/demo-script.md).
+
 ## Git workflow
 
 1. Keep `main` runnable.
