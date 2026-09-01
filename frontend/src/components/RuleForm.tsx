@@ -8,11 +8,12 @@ interface RuleFormProps {
    * offered as autocomplete so a judge (or you, live) can't typo a chain key —
    * while still allowing a genuinely new key for chaining onto a not-yet-created rule. */
   knownKeys: string[];
+  commandsBusy: boolean;
 }
 
 const OPERATORS: Operator[] = ["==", "!=", ">", ">=", "<", "<="];
 
-export function RuleForm({ onSubmit, lastRejectionMessage, knownKeys }: RuleFormProps) {
+export function RuleForm({ onSubmit, lastRejectionMessage, knownKeys, commandsBusy }: RuleFormProps) {
   const [name, setName] = useState("");
   const [priority, setPriority] = useState(50);
   const [variable, setVariable] = useState("laboratory.smoke");
@@ -111,8 +112,8 @@ export function RuleForm({ onSubmit, lastRejectionMessage, knownKeys }: RuleForm
       )}
 
       <div className="rule-form__footer">
-        <button type="submit" className="btn btn--primary">
-          Add rule
+        <button type="submit" className="btn btn--primary" disabled={commandsBusy}>
+          {commandsBusy ? "Working…" : "Add rule"}
         </button>
       </div>
     </form>

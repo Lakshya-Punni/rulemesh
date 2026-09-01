@@ -75,6 +75,30 @@ function operationErrorMessage(payload: unknown, fallback: string): string {
   return fallback;
 }
 
+function commandFeedback(command: ClientCommand): { pending: string; success: string } {
+  switch (command.type) {
+    case "create_rule":
+      return { pending: "Validating and saving rule…", success: "Rule created and graph re-evaluated." };
+    case "update_rule":
+      return { pending: "Updating rule…", success: "Rule updated across live sessions." };
+    case "toggle_rule":
+      return {
+        pending: `${command.enabled ? "Enabling" : "Disabling"} rule…`,
+        success: `Rule ${command.enabled ? "enabled" : "disabled"}.`,
+      };
+    case "delete_rule":
+      return { pending: "Deleting rule…", success: "Rule deleted and graph re-evaluated." };
+    case "set_manual":
+      return { pending: "Applying sensor update…", success: "Sensor update applied." };
+    case "reset_environment":
+      return { pending: "Resetting environment…", success: "Environment reset." };
+    case "reset_demo":
+      return { pending: "Restoring the judge demo…", success: "Demo restored to its known-good state." };
+    case "acknowledge_alert":
+      return { pending: "Acknowledging alert…", success: "Alert acknowledged." };
+  }
+}
+
 interface UseRuleMeshSocketResult {
   status: ConnectionStatus;
   state: StateMessage | null;
@@ -82,6 +106,9 @@ interface UseRuleMeshSocketResult {
   dismissCycleError: () => void;
   lastOperationError: string | null;
   dismissOperationError: () => void;
+  pendingOperation: string | null;
+  lastSuccessMessage: string | null;
+  dismissSuccessMessage: () => void;
   send: (command: ClientCommand) => void;
   startSimulation: (seed: number) => void;
   stopSimulation: () => void;
@@ -93,12 +120,15 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
   const [status, setStatus] = useState<ConnectionStatus>(USE_MOCK ? "open" : "connecting");
   const [lastCycleError, setLastCycleError] = useState<CycleError | null>(null);
   const [lastOperationError, setLastOperationError] = useState<string | null>(null);
+  const [pendingOperation, setPendingOperation] = useState<string | null>(null);
+  const [lastSuccessMessage, setLastSuccessMessage] = useState<string | null>(null);
   const [renderLatency, setRenderLatency] = useState({ p50: 0, p95: 0 });
   const mockRef = useRef<MockRuleMeshSocket | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const stateRef = useRef<StateMessage | null>(null);
   const latencySamplesRef = useRef<number[]>([]);
   const rejectedEventsRef = useRef(0);
+  const pendingCountRef = useRef(0);
 
   const handleStateMessage = useCallback((msg: StateMessage) => {
     const receivedAt = performance.now();
@@ -231,17 +261,19 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
           rejectedEventsRef.current += eventCount;
           setLastOperationError(operationErrorMessage(payload, "The environment update was rejected."));
           console.error("RuleMesh API rejected an environment update", payload);
-          return;
+          return false;
         }
 
         setLastOperationError(null);
         if (wsRef.current?.readyState !== WebSocket.OPEN && "type" in payload && payload.type === "snapshot") {
           handleBackendSnapshot(payload);
         }
+        return true;
       } catch (error) {
         setStatus("error");
         setLastOperationError(error instanceof Error ? error.message : "The backend could not be reached.");
         console.error("RuleMesh environment update failed", error);
+        return false;
       }
     },
     [handleBackendSnapshot],
@@ -259,16 +291,18 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
         if (!response.ok) {
           setLastOperationError(operationErrorMessage(payload, "The simulation command was rejected."));
           console.error("RuleMesh API rejected a simulation command", payload);
-          return;
+          return false;
         }
         setLastOperationError(null);
         if (wsRef.current?.readyState !== WebSocket.OPEN && "type" in payload && payload.type === "snapshot") {
           handleBackendSnapshot(payload);
         }
+        return true;
       } catch (error) {
         setStatus("error");
         setLastOperationError(error instanceof Error ? error.message : "The backend could not be reached.");
         console.error("RuleMesh simulation command failed", error);
+        return false;
       }
     },
     [handleBackendSnapshot],
@@ -304,16 +338,14 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
           path = `/api/rules/${encodeURIComponent(command.id)}`;
           break;
         case "set_manual":
-          await sendEnvironmentChanges({ [command.variable]: command.value });
-          return;
+          return await sendEnvironmentChanges({ [command.variable]: command.value });
         case "reset_environment":
-          await sendEnvironmentChanges(RESET_ENVIRONMENT);
-          return;
+          return await sendEnvironmentChanges(RESET_ENVIRONMENT);
         case "reset_demo":
           path = "/api/demo/reset";
           break;
         case "acknowledge_alert":
-          return;
+          return true;
       }
 
       try {
@@ -343,7 +375,7 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
             setLastOperationError(operationErrorMessage(payload, "The backend rejected this command."));
             console.error("RuleMesh API rejected a command", payload);
           }
-          return;
+          return false;
         }
 
         setLastOperationError(null);
@@ -351,41 +383,77 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
         if (wsRef.current?.readyState !== WebSocket.OPEN && "type" in payload && payload.type === "snapshot") {
           handleBackendSnapshot(payload);
         }
+        return true;
       } catch (error) {
         setStatus("error");
         setLastOperationError(error instanceof Error ? error.message : "The backend could not be reached.");
         console.error("RuleMesh API request failed", error);
+        return false;
       }
     },
     [handleBackendSnapshot, sendEnvironmentChanges],
   );
 
+  const executeWithFeedback = useCallback(
+    async (pending: string, success: string, operation: () => Promise<boolean>) => {
+      pendingCountRef.current += 1;
+      setPendingOperation(pending);
+      setLastSuccessMessage(null);
+      try {
+        if (await operation()) setLastSuccessMessage(success);
+      } finally {
+        pendingCountRef.current -= 1;
+        if (pendingCountRef.current === 0) setPendingOperation(null);
+      }
+    },
+    [],
+  );
+
   const send = useCallback(
     (command: ClientCommand) => {
-      if (USE_MOCK) mockRef.current?.send(command);
-      else void sendReal(command);
+      const feedback = commandFeedback(command);
+      void executeWithFeedback(feedback.pending, feedback.success, async () => {
+        if (USE_MOCK) {
+          mockRef.current?.send(command);
+          return true;
+        }
+        return await sendReal(command);
+      });
     },
-    [sendReal],
+    [executeWithFeedback, sendReal],
   );
 
   const startSimulation = useCallback(
     (seed: number) => {
-      if (USE_MOCK) {
-        mockRef.current?.startSimulation(seed);
-        return;
-      }
-      void sendSimulationControl("/api/simulation/start", { seed });
+      void executeWithFeedback("Starting deterministic simulation…", "Simulation started.", async () => {
+        if (USE_MOCK) {
+          mockRef.current?.startSimulation(seed);
+          return true;
+        }
+        return await sendSimulationControl("/api/simulation/start", { seed });
+      });
     },
-    [sendSimulationControl],
+    [executeWithFeedback, sendSimulationControl],
   );
 
   const stopSimulation = useCallback(() => {
-    if (USE_MOCK) mockRef.current?.stopSimulation();
-    else void sendSimulationControl("/api/simulation/stop");
-  }, [sendSimulationControl]);
+    void executeWithFeedback("Stopping simulation…", "Simulation stopped.", async () => {
+      if (USE_MOCK) {
+        mockRef.current?.stopSimulation();
+        return true;
+      }
+      return await sendSimulationControl("/api/simulation/stop");
+    });
+  }, [executeWithFeedback, sendSimulationControl]);
 
   const dismissCycleError = useCallback(() => setLastCycleError(null), []);
   const dismissOperationError = useCallback(() => setLastOperationError(null), []);
+  const dismissSuccessMessage = useCallback(() => setLastSuccessMessage(null), []);
+  useEffect(() => {
+    if (!lastSuccessMessage) return;
+    const timer = window.setTimeout(() => setLastSuccessMessage(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [lastSuccessMessage]);
   const measuredState = useMemo<StateMessage | null>(
     () =>
       state
@@ -408,6 +476,9 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
     dismissCycleError,
     lastOperationError,
     dismissOperationError,
+    pendingOperation,
+    lastSuccessMessage,
+    dismissSuccessMessage,
     send,
     startSimulation,
     stopSimulation,

@@ -10,6 +10,7 @@ interface RuleListProps {
   onToggle: (id: string, enabled: boolean) => void;
   onDelete: (id: string) => void;
   onUpdatePriority: (id: string, priority: number) => void;
+  commandsBusy: boolean;
 }
 
 function describe(rule: Rule): string {
@@ -17,7 +18,7 @@ function describe(rule: Rule): string {
   return `${conds}  =>  ${rule.action.target} = ${String(rule.action.value)}`;
 }
 
-export function RuleList({ rules, activeRuleNames, onToggle, onDelete, onUpdatePriority }: RuleListProps) {
+export function RuleList({ rules, activeRuleNames, onToggle, onDelete, onUpdatePriority, commandsBusy }: RuleListProps) {
   const sorted = [...rules].sort((a, b) => b.priority - a.priority);
 
   return (
@@ -31,6 +32,7 @@ export function RuleList({ rules, activeRuleNames, onToggle, onDelete, onUpdateP
           onToggle={onToggle}
           onDelete={onDelete}
           onUpdatePriority={onUpdatePriority}
+          commandsBusy={commandsBusy}
         />
       ))}
     </div>
@@ -43,9 +45,10 @@ interface RuleCardProps {
   onToggle: (id: string, enabled: boolean) => void;
   onDelete: (id: string) => void;
   onUpdatePriority: (id: string, priority: number) => void;
+  commandsBusy: boolean;
 }
 
-function RuleCard({ rule, isActive, onToggle, onDelete, onUpdatePriority }: RuleCardProps) {
+function RuleCard({ rule, isActive, onToggle, onDelete, onUpdatePriority, commandsBusy }: RuleCardProps) {
   // Local draft so keystrokes don't fire a command per character — we only
   // send update_rule on blur/Enter, and only if the value actually changed.
   // This matters for the two-session sync test in the plan (hours 11-13):
@@ -90,16 +93,27 @@ function RuleCard({ rule, isActive, onToggle, onDelete, onUpdatePriority }: Rule
           onKeyDown={(e) => {
             if (e.key === "Enter") (e.target as HTMLInputElement).blur();
           }}
+          disabled={commandsBusy}
           aria-label={`Priority for ${rule.name}`}
         />
       </div>
       <div className="rule-card__expr">{describe(rule)}</div>
       <div className="rule-card__actions">
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-muted)" }}>
-          <input type="checkbox" checked={rule.enabled} onChange={(e) => onToggle(rule.id, e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={rule.enabled}
+            onChange={(e) => onToggle(rule.id, e.target.checked)}
+            disabled={commandsBusy}
+          />
           Enabled
         </label>
-        <button className="btn btn--ghost btn--small" onClick={() => onDelete(rule.id)} style={{ marginLeft: "auto" }}>
+        <button
+          className="btn btn--ghost btn--small"
+          onClick={() => onDelete(rule.id)}
+          style={{ marginLeft: "auto" }}
+          disabled={commandsBusy}
+        >
           Delete
         </button>
       </div>

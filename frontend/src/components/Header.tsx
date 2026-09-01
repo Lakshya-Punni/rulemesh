@@ -10,6 +10,7 @@ interface HeaderProps {
   onStart: (seed: number) => void;
   onStop: () => void;
   isRunning: boolean;
+  commandsBusy: boolean;
 }
 
 const STATUS_LABEL: Record<ConnectionStatus, string> = {
@@ -19,7 +20,17 @@ const STATUS_LABEL: Record<ConnectionStatus, string> = {
   error: "Connection error",
 };
 
-export function Header({ status, seed, revision, connectedSessions, perf, onStart, onStop, isRunning }: HeaderProps) {
+export function Header({
+  status,
+  seed,
+  revision,
+  connectedSessions,
+  perf,
+  onStart,
+  onStop,
+  isRunning,
+  commandsBusy,
+}: HeaderProps) {
   const [seedInput, setSeedInput] = useState("42");
 
   const p95 = perf?.p95_latency_ms ?? 0;
@@ -42,15 +53,19 @@ export function Header({ status, seed, revision, connectedSessions, perf, onStar
           type="number"
           value={seedInput}
           onChange={(e) => setSeedInput(e.target.value)}
-          disabled={isRunning}
+          disabled={isRunning || commandsBusy}
           aria-label="Simulation seed"
         />
         {isRunning ? (
-          <button className="btn btn--danger" onClick={onStop}>
+          <button className="btn btn--danger" onClick={onStop} disabled={commandsBusy}>
             Stop simulation
           </button>
         ) : (
-          <button className="btn btn--primary" onClick={() => onStart(Number(seedInput) || 0)}>
+          <button
+            className="btn btn--primary"
+            onClick={() => onStart(Number(seedInput) || 0)}
+            disabled={commandsBusy || status !== "open"}
+          >
             Start simulation
           </button>
         )}

@@ -167,3 +167,117 @@ def test_demo_reset_restores_a_clean_known_state() -> None:
         "accepted_events": 0,
         "rejected_events": 0,
     }
+
+
+def test_judge_demo_flow_stays_consistent_across_two_live_sessions() -> None:
+    """Prove the complete demo path through public HTTP and WebSocket APIs."""
+    with TestClient(app) as demo_client:
+        demo_client.post("/api/demo/reset")
+
+        with demo_client.websocket_connect("/ws/live") as first_session:
+            first_session.receive_json()
+            with demo_client.websocket_connect("/ws/live") as second_session:
+                joined_first = first_session.receive_json()
+                joined_second = second_session.receive_json()
+                assert joined_first["connected_sessions"] == 2
+                assert joined_second["connected_sessions"] == 2
+
+                cooling = demo_client.post(
+                    "/api/environment",
+                    json={"changes": {"laboratory.temperature": 36.0}},
+                )
+                cooling_first = first_session.receive_json()
+                cooling_second = second_session.receive_json()
+                assert cooling.status_code == 200
+                assert cooling_first["revision"] == cooling_second["revision"]
+                assert cooling_first["state"]["laboratory.hvac"] == "cool"
+                assert "rule-6" in cooling_first["active_rule_ids"]
+
+                emergency = demo_client.post(
+                    "/api/environment",
+                    json={"changes": {"laboratory.smoke": 80.0}},
+                )
+                emergency_first = first_session.receive_json()
+                emergency_second = second_session.receive_json()
+                assert emergency.status_code == 200
+                assert emergency_first["revision"] == emergency_second["revision"]
+                assert emergency_first["state"] == emergency_second["state"]
+                assert emergency_first["state"]["laboratory.alarm"] is True
+                assert emergency_first["state"]["building.evacuation"] is True
+                assert emergency_first["state"]["laboratory.exit_locked"] is False
+                assert emergency_first["state"]["laboratory.emergency_lights"] is True
+                assert emergency_first["state"]["laboratory.hvac"] == "off"
+                hvac_conflict = next(
+                    conflict
+                    for conflict in emergency_first["conflicts"]
+                    if conflict["target"] == "laboratory.hvac"
+                )
+                assert hvac_conflict["winner"]["rule_name"] == "Smoke shutdown"
+
+                cleared = demo_client.post(
+                    "/api/environment",
+                    json={
+                        "changes": {
+                            "laboratory.smoke": 0.0,
+                            "laboratory.temperature": 24.0,
+                        }
+                    },
+                )
+                cleared_first = first_session.receive_json()
+                cleared_second = second_session.receive_json()
+                assert cleared.status_code == 200
+                assert cleared_first["revision"] == cleared_second["revision"]
+                assert cleared_first["active_rule_ids"] == []
+                assert cleared_first["conflicts"] == []
+                assert cleared_first["state"]["laboratory.alarm"] is False
+                assert cleared_first["state"]["building.evacuation"] is False
+                assert cleared_first["state"]["laboratory.exit_locked"] is True
+
+                rejected = demo_client.post(
+                    "/api/rules",
+                    json={
+                        "name": "Rejected evacuation loop",
+                        "enabled": True,
+                        "priority": 100,
+                        "conditions": [
+                            {
+                                "variable": "building.evacuation",
+                                "operator": "==",
+                                "value": True,
+                            }
+                        ],
+                        "action": {"target": "laboratory.alarm", "value": True},
+                    },
+                )
+                assert rejected.status_code == 422
+                assert rejected.json()["code"] == "CYCLE_DETECTED"
+                assert rejected.json()["path"][0] == rejected.json()["path"][-1]
+
+                # A rejected rule emits no state mutation. Trigger a harmless
+                # sensor event and verify both clients still receive the same
+                # seven-rule graph.
+                demo_client.post(
+                    "/api/environment",
+                    json={"changes": {"laboratory.smoke": 0.0}},
+                )
+                unchanged_first = first_session.receive_json()
+                unchanged_second = second_session.receive_json()
+                assert unchanged_first["revision"] == unchanged_second["revision"]
+                assert len(unchanged_first["rules"]) == 7
+                assert all(
+                    rule["name"] != "Rejected evacuation loop"
+                    for rule in unchanged_first["rules"]
+                )
+
+                reset = demo_client.post("/api/demo/reset")
+                reset_first = first_session.receive_json()
+                reset_second = second_session.receive_json()
+                assert reset.status_code == 200
+                assert reset_first["revision"] == reset_second["revision"]
+                assert reset_first["state"]["laboratory.smoke"] == 0.0
+                assert reset_first["active_rule_ids"] == []
+                assert reset_first["perf"] == {
+                    "events_per_second": 0,
+                    "accepted_events": 0,
+                    "rejected_events": 0,
+                }

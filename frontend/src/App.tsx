@@ -7,6 +7,7 @@ import { ActuatorGrid } from "./components/ActuatorGrid";
 import { ConflictPanel } from "./components/ConflictPanel";
 import { CycleBanner } from "./components/CycleBanner";
 import { OperationBanner } from "./components/OperationBanner";
+import { CommandStatus } from "./components/CommandStatus";
 import { RuleList } from "./components/RuleList";
 import { RuleForm } from "./components/RuleForm";
 import { DependencyGraph } from "./components/DependencyGraph";
@@ -34,6 +35,9 @@ function App() {
     dismissCycleError,
     lastOperationError,
     dismissOperationError,
+    pendingOperation,
+    lastSuccessMessage,
+    dismissSuccessMessage,
     send,
     startSimulation,
     stopSimulation,
@@ -41,6 +45,7 @@ function App() {
   const [selectedZone, setSelectedZone] = useState<(typeof ZONES)[number]>(ZONES[0]);
   const [sensorHistory, setSensorHistory] = useState<SensorSample[]>([]);
   const [trace, setTrace] = useState<TraceEntry[]>([]);
+  const commandsBusy = pendingOperation !== null;
 
   const prevStateRef = useRef<StateMessage | null>(null);
   const traceSeqRef = useRef(0);
@@ -201,6 +206,13 @@ function App() {
         onStart={handleStart}
         onStop={handleStop}
         isRunning={state?.simulation_running ?? false}
+        commandsBusy={commandsBusy}
+      />
+
+      <CommandStatus
+        pending={pendingOperation}
+        success={lastSuccessMessage}
+        onDismissSuccess={dismissSuccessMessage}
       />
 
       <div className="layout">
@@ -211,6 +223,7 @@ function App() {
             onZoneChange={setSelectedZone}
             onSetManual={(variable, value) => send({ type: "set_manual", variable, value })}
             onReset={handleResetDemo}
+            commandsBusy={commandsBusy}
           />
           <SensorChart zoneLabel={ZONE_LABELS[selectedZone]} samples={sensorHistory} />
           <ExecutionTrace entries={trace} />
@@ -231,7 +244,12 @@ function App() {
               Rules
               <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span className="panel__title-badge">{state?.rules.length ?? 0}</span>
-                <button className="btn btn--ghost btn--small" onClick={handleLoadStarterRules} type="button">
+                <button
+                  className="btn btn--ghost btn--small"
+                  onClick={handleLoadStarterRules}
+                  type="button"
+                  disabled={commandsBusy}
+                >
                   Load starter rules
                 </button>
               </span>
@@ -242,11 +260,13 @@ function App() {
               onToggle={(id, enabled) => send({ type: "toggle_rule", id, enabled })}
               onDelete={(id) => send({ type: "delete_rule", id })}
               onUpdatePriority={(id, priority) => send({ type: "update_rule", id, rule: { priority } })}
+              commandsBusy={commandsBusy}
             />
             <RuleForm
               onSubmit={handleCreateRule}
               lastRejectionMessage={lastCycleError?.message ?? null}
               knownKeys={knownKeys}
+              commandsBusy={commandsBusy}
             />
           </div>
         </div>

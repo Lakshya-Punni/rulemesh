@@ -7,6 +7,7 @@ interface ZoneControlsProps {
   onZoneChange: (zone: (typeof ZONES)[number]) => void;
   onSetManual: (variable: string, value: number | boolean) => void;
   onReset: () => void;
+  commandsBusy: boolean;
 }
 
 const ZONE_LABELS: Record<string, string> = {
@@ -17,14 +18,21 @@ const ZONE_LABELS: Record<string, string> = {
   office: "Office",
 };
 
-export function ZoneControls({ environment, selectedZone, onZoneChange, onSetManual, onReset }: ZoneControlsProps) {
+export function ZoneControls({
+  environment,
+  selectedZone,
+  onZoneChange,
+  onSetManual,
+  onReset,
+  commandsBusy,
+}: ZoneControlsProps) {
   const quietHours = Boolean(environment?.["building.quiet_hours"]);
 
   return (
     <div className="panel">
       <div className="panel__title">
         Environment controls
-        <button className="btn btn--ghost btn--small" onClick={onReset}>
+        <button className="btn btn--ghost btn--small" onClick={onReset} disabled={commandsBusy}>
           Reset demo
         </button>
       </div>

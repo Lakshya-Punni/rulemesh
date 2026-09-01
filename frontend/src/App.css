@@ -417,6 +417,53 @@
   margin-top: 6px;
 }
 
+/* ---------- Command feedback ---------- */
+
+.command-status {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.command-status--pending {
+  color: var(--accent-cyan);
+  background: var(--accent-cyan-dim);
+}
+
+.command-status--success {
+  color: var(--accent-green);
+  background: var(--accent-green-dim);
+}
+
+.command-status .btn {
+  margin-left: auto;
+}
+
+.command-status__spinner {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  border: 2px solid color-mix(in srgb, var(--accent-cyan) 25%, transparent);
+  border-top-color: var(--accent-cyan);
+  border-radius: 50%;
+  animation: command-status-spin 650ms linear infinite;
+}
+
+.command-status__check {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1;
+}
+
+@keyframes command-status-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ---------- Rule list ---------- */
 
 .rule-card {
