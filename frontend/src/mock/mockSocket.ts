@@ -91,6 +91,15 @@ export class MockRuleMeshSocket {
         this.env = initialEnvironment();
         break;
       }
+      case "reset_demo": {
+        this.stopSimulation();
+        this.rules = starterRules();
+        this.env = initialEnvironment();
+        this.seed = null;
+        this.accepted = 0;
+        this.rejected = 0;
+        break;
+      }
       case "acknowledge_alert":
         break;
     }

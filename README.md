@@ -49,6 +49,10 @@ The deterministic incident simulator also runs in the backend. Starting seed
 `42` in either browser drives one shared 10 Hz scenario and reports the real
 20 sensor events/second in every connected session.
 
+Use **Reset demo** before each rehearsal. It stops the shared simulator,
+restores the seven starter rules and sensor defaults, clears metrics and UI
+history, and synchronizes that clean state to every open dashboard.
+
 ## Git workflow
 
 1. Keep `main` runnable.

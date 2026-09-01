@@ -118,6 +118,13 @@ which produces 20 sensor events per second. The seed, running status, metrics,
 and resulting engine state are identical in every connected browser. Starting
 a new seed cancels the previous simulation task before launching the next one.
 
+## Reset demo
+
+`POST /api/demo/reset` takes no request body. It atomically stops the simulator,
+restores the default sensor values and all seven validated starter rules, clears
+performance counters, increments the revision, and broadcasts the clean
+snapshot to every connected browser.
+
 When contradictory active rules write the same actuator, `conflicts` contains:
 
 ```json

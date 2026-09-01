@@ -67,11 +67,21 @@ function percentile(sortedAsc: number[], p: number): number {
   return Math.round(sortedAsc[idx]);
 }
 
+function operationErrorMessage(payload: unknown, fallback: string): string {
+  if (payload && typeof payload === "object" && "detail" in payload) {
+    const detail = payload.detail;
+    if (typeof detail === "string") return detail;
+  }
+  return fallback;
+}
+
 interface UseRuleMeshSocketResult {
   status: ConnectionStatus;
   state: StateMessage | null;
   lastCycleError: CycleError | null;
   dismissCycleError: () => void;
+  lastOperationError: string | null;
+  dismissOperationError: () => void;
   send: (command: ClientCommand) => void;
   startSimulation: (seed: number) => void;
   stopSimulation: () => void;
@@ -82,6 +92,7 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
   const [state, setStateRaw] = useState<StateMessage | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>(USE_MOCK ? "open" : "connecting");
   const [lastCycleError, setLastCycleError] = useState<CycleError | null>(null);
+  const [lastOperationError, setLastOperationError] = useState<string | null>(null);
   const [renderLatency, setRenderLatency] = useState({ p50: 0, p95: 0 });
   const mockRef = useRef<MockRuleMeshSocket | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -218,15 +229,18 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
         const payload = (await response.json()) as BackendSnapshot | { detail?: string };
         if (!response.ok) {
           rejectedEventsRef.current += eventCount;
+          setLastOperationError(operationErrorMessage(payload, "The environment update was rejected."));
           console.error("RuleMesh API rejected an environment update", payload);
           return;
         }
 
+        setLastOperationError(null);
         if (wsRef.current?.readyState !== WebSocket.OPEN && "type" in payload && payload.type === "snapshot") {
           handleBackendSnapshot(payload);
         }
       } catch (error) {
         setStatus("error");
+        setLastOperationError(error instanceof Error ? error.message : "The backend could not be reached.");
         console.error("RuleMesh environment update failed", error);
       }
     },
@@ -243,14 +257,17 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
         });
         const payload = (await response.json()) as BackendSnapshot | { detail?: string };
         if (!response.ok) {
+          setLastOperationError(operationErrorMessage(payload, "The simulation command was rejected."));
           console.error("RuleMesh API rejected a simulation command", payload);
           return;
         }
+        setLastOperationError(null);
         if (wsRef.current?.readyState !== WebSocket.OPEN && "type" in payload && payload.type === "snapshot") {
           handleBackendSnapshot(payload);
         }
       } catch (error) {
         setStatus("error");
+        setLastOperationError(error instanceof Error ? error.message : "The backend could not be reached.");
         console.error("RuleMesh simulation command failed", error);
       }
     },
@@ -292,6 +309,9 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
         case "reset_environment":
           await sendEnvironmentChanges(RESET_ENVIRONMENT);
           return;
+        case "reset_demo":
+          path = "/api/demo/reset";
+          break;
         case "acknowledge_alert":
           return;
       }
@@ -306,6 +326,7 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
         if (!response.ok) {
           rejectedEventsRef.current += 1;
           if ("code" in payload && payload.code === "CYCLE_DETECTED") {
+            setLastOperationError(null);
             setLastCycleError({
               type: "cycle_error",
               path: payload.path,
@@ -319,16 +340,20 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
               message: `${payload.message} Path: ${payload.path.join(" → ")}`,
             });
           } else {
+            setLastOperationError(operationErrorMessage(payload, "The backend rejected this command."));
             console.error("RuleMesh API rejected a command", payload);
           }
           return;
         }
 
+        setLastOperationError(null);
+        if (command.type === "reset_demo") setLastCycleError(null);
         if (wsRef.current?.readyState !== WebSocket.OPEN && "type" in payload && payload.type === "snapshot") {
           handleBackendSnapshot(payload);
         }
       } catch (error) {
         setStatus("error");
+        setLastOperationError(error instanceof Error ? error.message : "The backend could not be reached.");
         console.error("RuleMesh API request failed", error);
       }
     },
@@ -360,6 +385,7 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
   }, [sendSimulationControl]);
 
   const dismissCycleError = useCallback(() => setLastCycleError(null), []);
+  const dismissOperationError = useCallback(() => setLastOperationError(null), []);
   const measuredState = useMemo<StateMessage | null>(
     () =>
       state
@@ -380,6 +406,8 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
     state: measuredState,
     lastCycleError,
     dismissCycleError,
+    lastOperationError,
+    dismissOperationError,
     send,
     startSimulation,
     stopSimulation,

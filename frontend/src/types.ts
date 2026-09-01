@@ -92,6 +92,7 @@ export type ClientCommand =
   | { type: "delete_rule"; id: string }
   | { type: "set_manual"; variable: string; value: number | boolean | string }
   | { type: "reset_environment" }
+  | { type: "reset_demo" }
   | { type: "acknowledge_alert"; id: string };
 
 export type ConnectionStatus = "connecting" | "open" | "closed" | "error";

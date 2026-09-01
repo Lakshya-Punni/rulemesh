@@ -25,6 +25,12 @@ class SimulationController:
         await live_connections.broadcast(snapshot)
         return snapshot
 
+    async def reset_demo(self) -> Snapshot:
+        await self._cancel_task()
+        snapshot = await runtime.reset_demo()
+        await live_connections.broadcast(snapshot)
+        return snapshot
+
     async def _cancel_task(self) -> None:
         task = self._task
         self._task = None

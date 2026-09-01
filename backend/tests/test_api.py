@@ -140,3 +140,30 @@ def test_simulation_is_server_owned_and_reports_real_event_counts() -> None:
     assert stopped.json()["simulation_seed"] == 42
     assert stopped.json()["perf"]["accepted_events"] >= before["perf"]["accepted_events"] + 2
     assert stopped.json()["perf"]["events_per_second"] >= 2
+
+
+def test_demo_reset_restores_a_clean_known_state() -> None:
+    with TestClient(app) as reset_client:
+        reset_client.delete("/api/rules/rule-1")
+        reset_client.post(
+            "/api/environment",
+            json={"changes": {"laboratory.smoke": 88, "building.quiet_hours": True}},
+        )
+        reset_client.post("/api/simulation/start", json={"seed": 99})
+        time.sleep(0.12)
+
+        reset = reset_client.post("/api/demo/reset")
+
+    assert reset.status_code == 200
+    snapshot = reset.json()
+    assert snapshot["simulation_running"] is False
+    assert snapshot["simulation_seed"] is None
+    assert snapshot["state"]["laboratory.smoke"] == 0.0
+    assert snapshot["state"]["laboratory.temperature"] == 24.0
+    assert snapshot["state"]["building.quiet_hours"] is False
+    assert [rule["id"] for rule in snapshot["rules"]] == [f"rule-{index}" for index in range(1, 8)]
+    assert snapshot["perf"] == {
+        "events_per_second": 0,
+        "accepted_events": 0,
+        "rejected_events": 0,
+    }

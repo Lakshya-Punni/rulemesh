@@ -115,6 +115,11 @@ async def stop_simulation() -> Snapshot:
     return await simulation.stop()
 
 
+@app.post("/api/demo/reset", response_model=Snapshot)
+async def reset_demo() -> Snapshot:
+    return await simulation.reset_demo()
+
+
 @app.websocket("/ws/live")
 async def live_state(websocket: WebSocket) -> None:
     await live_connections.connect(websocket)

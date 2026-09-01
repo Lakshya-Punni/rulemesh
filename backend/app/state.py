@@ -137,6 +137,23 @@ class RuntimeState:
         async with self.lock:
             self.rejected_events += 1
 
+    async def reset_demo(self) -> Snapshot:
+        async with self.lock:
+            self.sensor_values = dict(SENSOR_DEFAULTS)
+            self.effective_state = {**self.sensor_values, **self.actuator_defaults}
+            self.rules = []
+            self.active_rule_ids = []
+            self.conflicts = []
+            self.created_sequence = 0
+            self.simulation_running = False
+            self.simulation_seed = None
+            self.accepted_events = 0
+            self.rejected_events = 0
+            self.event_times.clear()
+            self._load_starter_rules()
+            self.revision += 1
+            return self._snapshot()
+
     async def add_rule(self, rule_create: RuleCreate) -> Snapshot:
         validate_rule_create(rule_create)
         async with self.lock:

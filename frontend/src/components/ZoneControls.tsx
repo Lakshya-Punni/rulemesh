@@ -25,7 +25,7 @@ export function ZoneControls({ environment, selectedZone, onZoneChange, onSetMan
       <div className="panel__title">
         Environment controls
         <button className="btn btn--ghost btn--small" onClick={onReset}>
-          Reset
+          Reset demo
         </button>
       </div>
 

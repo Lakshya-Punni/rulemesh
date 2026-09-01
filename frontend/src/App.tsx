@@ -6,6 +6,7 @@ import { ZoneControls } from "./components/ZoneControls";
 import { ActuatorGrid } from "./components/ActuatorGrid";
 import { ConflictPanel } from "./components/ConflictPanel";
 import { CycleBanner } from "./components/CycleBanner";
+import { OperationBanner } from "./components/OperationBanner";
 import { RuleList } from "./components/RuleList";
 import { RuleForm } from "./components/RuleForm";
 import { DependencyGraph } from "./components/DependencyGraph";
@@ -26,8 +27,17 @@ const MAX_SENSOR_SAMPLES = 80; // ~8s of history at the 10Hz tick rate
 const MAX_TRACE_ENTRIES = 40;
 
 function App() {
-  const { status, state, lastCycleError, dismissCycleError, send, startSimulation, stopSimulation } =
-    useRuleMeshSocket();
+  const {
+    status,
+    state,
+    lastCycleError,
+    dismissCycleError,
+    lastOperationError,
+    dismissOperationError,
+    send,
+    startSimulation,
+    stopSimulation,
+  } = useRuleMeshSocket();
   const [selectedZone, setSelectedZone] = useState<(typeof ZONES)[number]>(ZONES[0]);
   const [sensorHistory, setSensorHistory] = useState<SensorSample[]>([]);
   const [trace, setTrace] = useState<TraceEntry[]>([]);
@@ -46,6 +56,14 @@ function App() {
 
   function handleCreateRule(rule: RuleDraft) {
     send({ type: "create_rule", rule });
+  }
+
+  function handleResetDemo() {
+    dismissCycleError();
+    dismissOperationError();
+    setSensorHistory([]);
+    setTrace([]);
+    send({ type: "reset_demo" });
   }
 
   // "Load starter rules" (plan hours 5-7, Person B) — re-adds any of the
@@ -192,7 +210,7 @@ function App() {
             selectedZone={selectedZone}
             onZoneChange={setSelectedZone}
             onSetManual={(variable, value) => send({ type: "set_manual", variable, value })}
-            onReset={() => send({ type: "reset_environment" })}
+            onReset={handleResetDemo}
           />
           <SensorChart zoneLabel={ZONE_LABELS[selectedZone]} samples={sensorHistory} />
           <ExecutionTrace entries={trace} />
@@ -202,6 +220,7 @@ function App() {
           <ActuatorGrid actuators={state?.actuators ?? null} />
           <div className="panel">
             <CycleBanner error={lastCycleError} onDismiss={dismissCycleError} />
+            <OperationBanner message={lastOperationError} onDismiss={dismissOperationError} />
             <ConflictPanel conflicts={state?.conflicts ?? []} />
           </div>
         </div>
