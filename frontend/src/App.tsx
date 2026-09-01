@@ -196,7 +196,10 @@ function App() {
       />
 
       <div className="layout">
-        <div className="layout__col">
+        <section className="layout__col layout__col--controls">
+          <div className="column-heading">
+            <span className="column-heading__index">01</span> Inputs &amp; scenarios
+          </div>
           <ZoneControls
             environment={state?.environment ?? null}
             selectedZone={selectedZone}
@@ -208,18 +211,24 @@ function App() {
           />
           <SensorChart zoneLabel={ZONE_LABELS[selectedZone]} samples={sensorHistory} />
           <ExecutionTrace entries={trace} />
-        </div>
+        </section>
 
-        <div className="layout__col">
+        <section className="layout__col layout__col--decisions">
+          <div className="column-heading">
+            <span className="column-heading__index">02</span> Engine decisions
+          </div>
           <ActuatorGrid actuators={state?.actuators ?? null} />
           <div className="panel">
             <CycleBanner error={lastCycleError} onDismiss={dismissCycleError} />
             <OperationBanner message={lastOperationError} onDismiss={dismissOperationError} />
             <ConflictPanel conflicts={state?.conflicts ?? []} />
           </div>
-        </div>
+        </section>
 
-        <div className="layout__col">
+        <section className="layout__col layout__col--rules">
+          <div className="column-heading">
+            <span className="column-heading__index">03</span> Live rule registry
+          </div>
           <div className="panel">
             <div className="panel__title">
               Rules
@@ -240,7 +249,7 @@ function App() {
               commandsBusy={commandsBusy}
             />
           </div>
-        </div>
+        </section>
       </div>
 
       <DependencyGraph

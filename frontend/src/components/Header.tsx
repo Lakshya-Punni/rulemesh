@@ -45,8 +45,9 @@ export function Header({
   return (
     <header className="header">
       <div className="header__brand">
+        <span className="header__mark" aria-hidden="true" />
         <div className="header__title">RuleMesh</div>
-        <div className="header__subtitle">Graph-native automation · server-owned live simulation</div>
+        <div className="header__subtitle">Graph-native automation / live control plane</div>
       </div>
 
       <div className="connection">
@@ -60,13 +61,16 @@ export function Header({
       </div>
 
       <div className="sim-controls">
-        <input
-          type="number"
-          value={seedInput}
-          onChange={(e) => setSeedInput(e.target.value)}
-          disabled={isRunning || commandsBusy}
-          aria-label="Simulation seed"
-        />
+        <label className="sim-controls__seed">
+          <span>SEED</span>
+          <input
+            type="number"
+            value={seedInput}
+            onChange={(e) => setSeedInput(e.target.value)}
+            disabled={isRunning || commandsBusy}
+            aria-label="Simulation seed"
+          />
+        </label>
         {isRunning ? (
           <button className="btn btn--danger" onClick={onStop} disabled={commandsBusy}>
             Stop simulation

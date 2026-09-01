@@ -29,7 +29,7 @@ export function SensorChart({ zoneLabel, samples }: SensorChartProps) {
         <div style={{ width: "100%", height: 140 }}>
           <ResponsiveContainer>
             <LineChart data={samples} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
-              <CartesianGrid stroke="#1c222b" vertical={false} />
+              <CartesianGrid stroke="var(--border)" vertical={false} />
               <XAxis dataKey="t" hide />
               <YAxis
                 width={36}
@@ -40,8 +40,9 @@ export function SensorChart({ zoneLabel, samples }: SensorChartProps) {
                 contentStyle={{
                   background: "var(--panel-raised)",
                   border: "1px solid var(--border)",
-                  borderRadius: 6,
+                  borderRadius: 3,
                   fontSize: 11,
+                  fontFamily: "var(--font-mono)",
                 }}
                 labelFormatter={() => ""}
               />
