@@ -28,7 +28,6 @@ const MAX_TRACE_ENTRIES = 40;
 function App() {
   const { status, state, lastCycleError, dismissCycleError, send, startSimulation, stopSimulation } =
     useRuleMeshSocket();
-  const [isRunning, setIsRunning] = useState(false);
   const [selectedZone, setSelectedZone] = useState<(typeof ZONES)[number]>(ZONES[0]);
   const [sensorHistory, setSensorHistory] = useState<SensorSample[]>([]);
   const [trace, setTrace] = useState<TraceEntry[]>([]);
@@ -39,12 +38,10 @@ function App() {
 
   function handleStart(seed: number) {
     startSimulation(seed);
-    setIsRunning(true);
   }
 
   function handleStop() {
     stopSimulation();
-    setIsRunning(false);
   }
 
   function handleCreateRule(rule: RuleDraft) {
@@ -185,7 +182,7 @@ function App() {
         perf={state?.perf ?? null}
         onStart={handleStart}
         onStop={handleStop}
-        isRunning={isRunning}
+        isRunning={state?.simulation_running ?? false}
       />
 
       <div className="layout">

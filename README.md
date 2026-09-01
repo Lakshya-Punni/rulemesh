@@ -45,6 +45,10 @@ frontend uses REST for commands and treats `/ws/live` snapshots as the
 authoritative live state. Set `VITE_USE_MOCK=true` only when the backend is
 unavailable.
 
+The deterministic incident simulator also runs in the backend. Starting seed
+`42` in either browser drives one shared 10 Hz scenario and reports the real
+20 sensor events/second in every connected session.
+
 ## Git workflow
 
 1. Keep `main` runnable.

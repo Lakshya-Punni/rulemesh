@@ -93,9 +93,30 @@ The backend sends a snapshot immediately after connection and after every commit
   },
   "active_rule_ids": [],
   "conflicts": [],
-  "connected_sessions": 1
+  "connected_sessions": 1,
+  "simulation_running": false,
+  "simulation_seed": null,
+  "perf": {
+    "events_per_second": 0,
+    "accepted_events": 0,
+    "rejected_events": 0
+  }
 }
 ```
+
+## Authoritative simulation
+
+`POST /api/simulation/start`
+
+```json
+{ "seed": 42 }
+```
+
+`POST /api/simulation/stop` takes no request body. The simulator runs in the
+backend at 10 ticks per second and atomically updates smoke and temperature,
+which produces 20 sensor events per second. The seed, running status, metrics,
+and resulting engine state are identical in every connected browser. Starting
+a new seed cancels the previous simulation task before launching the next one.
 
 When contradictory active rules write the same actuator, `conflicts` contains:
 

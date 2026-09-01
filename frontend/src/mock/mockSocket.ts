@@ -142,6 +142,7 @@ export class MockRuleMeshSocket {
       conflicts,
       active_chains,
       connected_sessions: this.connectedSessions,
+      simulation_running: this.tickHandle !== null,
       perf: {
         events_per_second: this.tickHandle ? 20 : 0,
         // p50/p95 are NOT measured here — they're overwritten by useRuleMeshSocket

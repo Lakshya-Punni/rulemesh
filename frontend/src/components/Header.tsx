@@ -29,7 +29,7 @@ export function Header({ status, seed, revision, connectedSessions, perf, onStar
     <header className="header">
       <div className="header__brand">
         <div className="header__title">RuleMesh</div>
-        <div className="header__subtitle">Graph-native automation · smart building</div>
+        <div className="header__subtitle">Graph-native automation · server-owned live simulation</div>
       </div>
 
       <div className="connection">

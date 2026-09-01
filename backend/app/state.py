@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import time
+from collections import deque
 
 from fastapi import WebSocket
 
 from .engine import recompute_state
 from .graph import CycleDetectedError, build_graph_snapshot, validate_acyclic
-from .models import Rule, RuleCreate, RuleUpdate, ScalarValue, Snapshot
+from .models import PerformanceSnapshot, Rule, RuleCreate, RuleUpdate, ScalarValue, Snapshot
 from .starter_rules import starter_rule_creates
 from .variables import ACTUATOR_DEFAULTS, SENSOR_DEFAULTS, validate_environment_changes, validate_rule_create
 
@@ -56,6 +58,11 @@ class RuntimeState:
         self.conflicts = []
         self.created_sequence = 0
         self.revision = 0
+        self.simulation_running = False
+        self.simulation_seed: int | None = None
+        self.accepted_events = 0
+        self.rejected_events = 0
+        self.event_times: deque[float] = deque()
         self._load_starter_rules()
 
     def _load_starter_rules(self) -> None:
@@ -80,6 +87,9 @@ class RuntimeState:
         )
 
     def _snapshot(self) -> Snapshot:
+        cutoff = time.monotonic() - 1.0
+        while self.event_times and self.event_times[0] < cutoff:
+            self.event_times.popleft()
         return Snapshot(
             revision=self.revision,
             state=dict(self.effective_state),
@@ -88,6 +98,13 @@ class RuntimeState:
             active_rule_ids=list(self.active_rule_ids),
             conflicts=list(self.conflicts),
             connected_sessions=live_connections.count,
+            simulation_running=self.simulation_running,
+            simulation_seed=self.simulation_seed,
+            perf=PerformanceSnapshot(
+                events_per_second=len(self.event_times),
+                accepted_events=self.accepted_events,
+                rejected_events=self.rejected_events,
+            ),
         )
 
     async def snapshot(self) -> Snapshot:
@@ -98,9 +115,27 @@ class RuntimeState:
         validate_environment_changes(changes)
         async with self.lock:
             self.sensor_values.update(changes)
+            now = time.monotonic()
+            self.event_times.extend(now for _ in changes)
+            self.accepted_events += len(changes)
             self._recompute()
             self.revision += 1
             return self._snapshot()
+
+    async def set_simulation_status(self, running: bool, seed: int | None = None) -> Snapshot:
+        async with self.lock:
+            changed = self.simulation_running != running
+            self.simulation_running = running
+            if seed is not None and seed != self.simulation_seed:
+                self.simulation_seed = seed
+                changed = True
+            if changed:
+                self.revision += 1
+            return self._snapshot()
+
+    async def record_rejection(self) -> None:
+        async with self.lock:
+            self.rejected_events += 1
 
     async def add_rule(self, rule_create: RuleCreate) -> Snapshot:
         validate_rule_create(rule_create)

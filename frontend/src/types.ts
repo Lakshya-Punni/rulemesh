@@ -76,6 +76,7 @@ export interface StateMessage {
   conflicts: ConflictInfo[];
   active_chains: ActiveChain[];
   connected_sessions: number;
+  simulation_running: boolean;
   perf: PerfStats;
   batch_id?: string;
 }

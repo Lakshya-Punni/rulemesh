@@ -61,6 +61,12 @@ class EnvironmentUpdate(BaseModel):
     changes: dict[str, ScalarValue] = Field(min_length=1)
 
 
+class SimulationStart(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    seed: int
+
+
 class ProposalSummary(BaseModel):
     rule_id: str
     rule_name: str
@@ -81,6 +87,12 @@ class GraphSnapshot(BaseModel):
     edges: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class PerformanceSnapshot(BaseModel):
+    events_per_second: int = 0
+    accepted_events: int = 0
+    rejected_events: int = 0
+
+
 class Snapshot(BaseModel):
     type: Literal["snapshot"] = "snapshot"
     revision: int
@@ -90,6 +102,9 @@ class Snapshot(BaseModel):
     active_rule_ids: list[str]
     conflicts: list[ConflictRecord]
     connected_sessions: int = 0
+    simulation_running: bool = False
+    simulation_seed: int | None = None
+    perf: PerformanceSnapshot = Field(default_factory=PerformanceSnapshot)
 
 
 class CycleError(BaseModel):

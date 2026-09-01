@@ -1,3 +1,5 @@
+import time
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -120,3 +122,21 @@ def test_rule_update_rejects_cycle_without_mutating_saved_rule() -> None:
 
     client.delete(f"/api/rules/{second_id}")
     client.delete(f"/api/rules/{first_id}")
+
+
+def test_simulation_is_server_owned_and_reports_real_event_counts() -> None:
+    with TestClient(app) as simulation_client:
+        before = simulation_client.post("/api/simulation/stop").json()
+        started = simulation_client.post("/api/simulation/start", json={"seed": 42})
+        assert started.status_code == 200
+        assert started.json()["simulation_running"] is True
+        assert started.json()["simulation_seed"] == 42
+
+        time.sleep(0.25)
+        stopped = simulation_client.post("/api/simulation/stop")
+
+    assert stopped.status_code == 200
+    assert stopped.json()["simulation_running"] is False
+    assert stopped.json()["simulation_seed"] == 42
+    assert stopped.json()["perf"]["accepted_events"] >= before["perf"]["accepted_events"] + 2
+    assert stopped.json()["perf"]["events_per_second"] >= 2

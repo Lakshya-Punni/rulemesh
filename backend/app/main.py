@@ -5,7 +5,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .graph import CycleDetectedError
-from .models import CycleError, EnvironmentUpdate, RuleCreate, RuleToggle, RuleUpdate, Snapshot
+from .models import (
+    CycleError,
+    EnvironmentUpdate,
+    RuleCreate,
+    RuleToggle,
+    RuleUpdate,
+    SimulationStart,
+    Snapshot,
+)
+from .simulation import simulation
 from .state import RuleNotFoundError, live_connections, runtime
 
 
@@ -34,6 +43,7 @@ async def update_environment(request: EnvironmentUpdate) -> Snapshot:
     try:
         snapshot = await runtime.update_environment(request.changes)
     except ValueError as error:
+        await runtime.record_rejection()
         raise HTTPException(status_code=422, detail=str(error)) from error
     await live_connections.broadcast(snapshot)
     return snapshot
@@ -44,8 +54,10 @@ async def create_rule(request: RuleCreate) -> Snapshot | JSONResponse:
     try:
         snapshot = await runtime.add_rule(request)
     except ValueError as error:
+        await runtime.record_rejection()
         raise HTTPException(status_code=422, detail=str(error)) from error
     except CycleDetectedError as error:
+        await runtime.record_rejection()
         payload = CycleError(path=error.path, proposed_edges=error.proposed_edges)
         return JSONResponse(status_code=422, content=payload.model_dump(mode="json"))
     await live_connections.broadcast(snapshot)
@@ -64,8 +76,10 @@ async def update_rule(rule_id: str, request: RuleUpdate) -> Snapshot | JSONRespo
     except RuleNotFoundError as error:
         raise HTTPException(status_code=404, detail=f"Rule not found: {rule_id}") from error
     except ValueError as error:
+        await runtime.record_rejection()
         raise HTTPException(status_code=422, detail=str(error)) from error
     except CycleDetectedError as error:
+        await runtime.record_rejection()
         return cycle_response(error)
     await live_connections.broadcast(snapshot)
     return snapshot
@@ -89,6 +103,16 @@ async def delete_rule(rule_id: str) -> Snapshot:
         raise HTTPException(status_code=404, detail=f"Rule not found: {rule_id}") from error
     await live_connections.broadcast(snapshot)
     return snapshot
+
+
+@app.post("/api/simulation/start", response_model=Snapshot)
+async def start_simulation(request: SimulationStart) -> Snapshot:
+    return await simulation.start(request.seed)
+
+
+@app.post("/api/simulation/stop", response_model=Snapshot)
+async def stop_simulation() -> Snapshot:
+    return await simulation.stop()
 
 
 @app.websocket("/ws/live")

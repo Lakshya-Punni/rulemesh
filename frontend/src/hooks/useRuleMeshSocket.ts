@@ -46,6 +46,13 @@ interface BackendSnapshot {
     reason: string;
   }>;
   connected_sessions?: number;
+  simulation_running?: boolean;
+  simulation_seed?: number | null;
+  perf?: {
+    events_per_second: number;
+    accepted_events: number;
+    rejected_events: number;
+  };
 }
 
 interface BackendCycleError {
@@ -58,16 +65,6 @@ function percentile(sortedAsc: number[], p: number): number {
   if (sortedAsc.length === 0) return 0;
   const idx = Math.min(sortedAsc.length - 1, Math.floor(p * sortedAsc.length));
   return Math.round(sortedAsc[idx]);
-}
-
-function mulberry32(seed: number) {
-  return () => {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 interface UseRuleMeshSocketResult {
@@ -89,13 +86,8 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
   const mockRef = useRef<MockRuleMeshSocket | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const stateRef = useRef<StateMessage | null>(null);
-  const simulationRef = useRef<number | null>(null);
-  const simulationBusyRef = useRef(false);
-  const seedRef = useRef<number | null>(null);
   const latencySamplesRef = useRef<number[]>([]);
-  const acceptedEventsRef = useRef(0);
   const rejectedEventsRef = useRef(0);
-  const eventTimesRef = useRef<number[]>([]);
 
   const handleStateMessage = useCallback((msg: StateMessage) => {
     const receivedAt = performance.now();
@@ -122,12 +114,10 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
       }
 
       const activeIds = new Set(snapshot.active_rule_ids);
-      const now = performance.now();
-      eventTimesRef.current = eventTimesRef.current.filter((at) => now - at <= 1000);
       handleStateMessage({
         type: "state",
         revision: snapshot.revision,
-        seed: seedRef.current,
+        seed: snapshot.simulation_seed ?? null,
         environment,
         actuators,
         rules: snapshot.rules,
@@ -147,12 +137,13 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
             })),
           ),
         connected_sessions: snapshot.connected_sessions ?? 1,
+        simulation_running: snapshot.simulation_running ?? false,
         perf: {
-          events_per_second: eventTimesRef.current.length,
+          events_per_second: snapshot.perf?.events_per_second ?? 0,
           p50_latency_ms: 0,
           p95_latency_ms: 0,
-          accepted_events: acceptedEventsRef.current,
-          rejected_events: rejectedEventsRef.current,
+          accepted_events: snapshot.perf?.accepted_events ?? 0,
+          rejected_events: Math.max(snapshot.perf?.rejected_events ?? 0, rejectedEventsRef.current),
         },
       });
     },
@@ -212,15 +203,8 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
       cancelled = true;
       if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
       wsRef.current?.close();
-      if (simulationRef.current !== null) window.clearInterval(simulationRef.current);
     };
   }, [handleBackendSnapshot, handleStateMessage]);
-
-  const recordAccepted = useCallback((count: number) => {
-    acceptedEventsRef.current += count;
-    const now = performance.now();
-    for (let i = 0; i < count; i += 1) eventTimesRef.current.push(now);
-  }, []);
 
   const sendEnvironmentChanges = useCallback(
     async (changes: EnvironmentState) => {
@@ -238,7 +222,6 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
           return;
         }
 
-        recordAccepted(eventCount);
         if (wsRef.current?.readyState !== WebSocket.OPEN && "type" in payload && payload.type === "snapshot") {
           handleBackendSnapshot(payload);
         }
@@ -247,7 +230,31 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
         console.error("RuleMesh environment update failed", error);
       }
     },
-    [handleBackendSnapshot, recordAccepted],
+    [handleBackendSnapshot],
+  );
+
+  const sendSimulationControl = useCallback(
+    async (path: "/api/simulation/start" | "/api/simulation/stop", body?: { seed: number }) => {
+      try {
+        const response = await fetch(`${API_URL}${path}`, {
+          method: "POST",
+          headers: body ? { "Content-Type": "application/json" } : undefined,
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        const payload = (await response.json()) as BackendSnapshot | { detail?: string };
+        if (!response.ok) {
+          console.error("RuleMesh API rejected a simulation command", payload);
+          return;
+        }
+        if (wsRef.current?.readyState !== WebSocket.OPEN && "type" in payload && payload.type === "snapshot") {
+          handleBackendSnapshot(payload);
+        }
+      } catch (error) {
+        setStatus("error");
+        console.error("RuleMesh simulation command failed", error);
+      }
+    },
+    [handleBackendSnapshot],
   );
 
   const sendReal = useCallback(
@@ -317,7 +324,6 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
           return;
         }
 
-        recordAccepted(1);
         if (wsRef.current?.readyState !== WebSocket.OPEN && "type" in payload && payload.type === "snapshot") {
           handleBackendSnapshot(payload);
         }
@@ -326,7 +332,7 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
         console.error("RuleMesh API request failed", error);
       }
     },
-    [handleBackendSnapshot, recordAccepted, sendEnvironmentChanges],
+    [handleBackendSnapshot, sendEnvironmentChanges],
   );
 
   const send = useCallback(
@@ -343,36 +349,15 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
         mockRef.current?.startSimulation(seed);
         return;
       }
-      if (simulationRef.current !== null) window.clearInterval(simulationRef.current);
-      seedRef.current = seed;
-      const random = mulberry32(seed);
-      const incidentTick = 18 + Math.floor(random() * 12);
-      let tick = 0;
-      simulationRef.current = window.setInterval(() => {
-        if (simulationBusyRef.current) return;
-        simulationBusyRef.current = true;
-        tick += 1;
-        const smoke = tick < incidentTick ? Math.round(random() * 8) : Math.min(95, (tick - incidentTick) * 6);
-        const temperature = tick < incidentTick ? 24 + random() * 2 : Math.min(45, 26 + (tick - incidentTick) * 1.2);
-        void sendEnvironmentChanges({
-          "laboratory.smoke": smoke,
-          "laboratory.temperature": temperature,
-        })
-          .finally(() => {
-            simulationBusyRef.current = false;
-          });
-      }, 100);
+      void sendSimulationControl("/api/simulation/start", { seed });
     },
-    [sendEnvironmentChanges],
+    [sendSimulationControl],
   );
 
   const stopSimulation = useCallback(() => {
     if (USE_MOCK) mockRef.current?.stopSimulation();
-    else if (simulationRef.current !== null) {
-      window.clearInterval(simulationRef.current);
-      simulationRef.current = null;
-    }
-  }, []);
+    else void sendSimulationControl("/api/simulation/stop");
+  }, [sendSimulationControl]);
 
   const dismissCycleError = useCallback(() => setLastCycleError(null), []);
   const measuredState = useMemo<StateMessage | null>(
