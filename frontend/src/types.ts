@@ -71,6 +71,7 @@ export interface PerfStats {
 // The authoritative broadcast the server sends after every tick / mutation.
 export interface StateMessage {
   type: "state";
+  emitted_at_ms?: number;
   revision: number;
   seed: number | null;
   environment: EnvironmentState;

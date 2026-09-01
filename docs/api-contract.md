@@ -84,6 +84,7 @@ The backend sends a snapshot immediately after connection and after every commit
 ```json
 {
   "type": "snapshot",
+  "emitted_at_ms": 1788264000000,
   "revision": 1,
   "state": {},
   "rules": [],
@@ -121,10 +122,11 @@ second. The seed, running status, metrics, and resulting engine state are
 identical in every connected browser. Starting a new seed cancels the previous
 simulation task before launching the next one.
 
-`perf.target_events_per_second` is `500`. The frontend measures render latency
-from receipt of an authoritative WebSocket snapshot through two animation
-frames and reports rolling p50/p95 values. Its SLA badge passes only when live
-throughput is at least 500 EPS and p95 latency is below 200 ms.
+`perf.target_events_per_second` is `500`. Every snapshot carries
+`emitted_at_ms`; the frontend measures end-to-end interface latency from that
+server timestamp through two browser animation frames and reports rolling
+p50/p95 values. Its SLA badge passes only when live throughput is at least 500
+EPS and p95 latency is below 200 ms.
 
 Concurrent commands commit under the runtime lock. Broadcasts are serialized,
 obsolete revisions are dropped server-side, and clients also reject any stale

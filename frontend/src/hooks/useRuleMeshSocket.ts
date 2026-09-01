@@ -10,9 +10,9 @@ import type {
 } from "../types";
 import { MockRuleMeshSocket } from "../mock/mockSocket";
 
-const WS_URL = import.meta.env.VITE_WS_URL as string | undefined;
+const WS_URL = (import.meta.env.VITE_WS_URL as string | undefined) ?? "ws://localhost:8000/ws/live";
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:8000";
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true" || !WS_URL;
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
 const LATENCY_WINDOW = 60;
 const SENSOR_KEYS = new Set([
   "laboratory.smoke",
@@ -35,6 +35,7 @@ interface BackendProposal {
 
 interface BackendSnapshot {
   type: "snapshot";
+  emitted_at_ms?: number;
   revision: number;
   state: EnvironmentState;
   rules: Rule[];
@@ -117,7 +118,6 @@ interface UseRuleMeshSocketResult {
   send: (command: ClientCommand) => void;
   startSimulation: (seed: number) => void;
   stopSimulation: () => void;
-  usingMock: boolean;
 }
 
 export function useRuleMeshSocket(): UseRuleMeshSocketResult {
@@ -141,7 +141,9 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
     setStateRaw(msg);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const latency = performance.now() - receivedAt;
+        const latency = msg.emitted_at_ms
+          ? Math.max(0, Date.now() - msg.emitted_at_ms)
+          : performance.now() - receivedAt;
         const samples = latencySamplesRef.current;
         samples.push(latency);
         if (samples.length > LATENCY_WINDOW) samples.shift();
@@ -166,6 +168,7 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
       const activeIds = new Set(snapshot.active_rule_ids);
       handleStateMessage({
         type: "state",
+        emitted_at_ms: snapshot.emitted_at_ms,
         revision: snapshot.revision,
         seed: snapshot.simulation_seed ?? null,
         environment,
@@ -221,7 +224,7 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
 
     const connect = () => {
       if (cancelled) return;
-      const ws = new WebSocket(WS_URL!);
+      const ws = new WebSocket(WS_URL);
       wsRef.current = ws;
       ws.onopen = () => {
         if (cancelled) return;
@@ -496,6 +499,5 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
     send,
     startSimulation,
     stopSimulation,
-    usingMock: USE_MOCK,
   };
 }

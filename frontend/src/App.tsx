@@ -1,3 +1,4 @@
+/* oxlint-disable react/set-state-in-effect -- WebSocket snapshots and rejection events are external sources synchronized into bounded UI history. */
 import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { useRuleMeshSocket } from "./hooks/useRuleMeshSocket";
@@ -13,7 +14,7 @@ import { RuleForm } from "./components/RuleForm";
 import { DependencyGraph } from "./components/DependencyGraph";
 import { SensorChart, type SensorSample } from "./components/SensorChart";
 import { ExecutionTrace, type TraceEntry } from "./components/ExecutionTrace";
-import { ZONES, starterRules } from "./mock/engine";
+import { ZONES } from "./mock/engine";
 import type { Rule, RuleDraft, StateMessage } from "./types";
 
 const ZONE_LABELS: Record<string, string> = {
@@ -70,27 +71,6 @@ function App() {
     setTrace([]);
     send({ type: "reset_demo" });
   }
-
-  // "Load starter rules" (plan hours 5-7, Person B) — re-adds any of the
-  // seven default rule patterns that are currently missing (by name),
-  // without a new command type: it's just create_rule commands the server
-  // already understands, so no contract change is needed. Useful for
-  // resetting to a known-good demo state after live rule editing.
-  function handleLoadStarterRules() {
-    const existingNames = new Set((state?.rules ?? []).map((r) => r.name));
-    for (const { id: _id, created_sequence: _seq, ...draft } of starterRules()) {
-      if (!existingNames.has(draft.name)) {
-        send({ type: "create_rule", rule: draft });
-      }
-    }
-  }
-
-  // Reset the selected-zone chart history whenever the zone changes, so
-  // stale data from a different zone never lingers on screen.
-  useEffect(() => {
-    setSensorHistory([]);
-    sensorTRef.current = 0;
-  }, [selectedZone]);
 
   // Append one sensor sample per state message (naturally <=10Hz, since the
   // simulator ticks at 100ms) and derive execution-trace entries by diffing
@@ -188,7 +168,7 @@ function App() {
     if (state?.environment) for (const k of Object.keys(state.environment)) keys.add(k);
     if (state?.actuators) for (const k of Object.keys(state.actuators)) keys.add(k);
     return [...keys].sort();
-  }, [state?.environment, state?.actuators]);
+  }, [state]);
 
   const activeRuleNames = useMemo(
     () => new Set((state?.active_chains ?? []).map((c) => c.nodes[1])),
@@ -243,17 +223,7 @@ function App() {
           <div className="panel">
             <div className="panel__title">
               Rules
-              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span className="panel__title-badge">{state?.rules.length ?? 0}</span>
-                <button
-                  className="btn btn--ghost btn--small"
-                  onClick={handleLoadStarterRules}
-                  type="button"
-                  disabled={commandsBusy}
-                >
-                  Load starter rules
-                </button>
-              </span>
+              <span className="panel__title-badge">{state?.rules.length ?? 0}</span>
             </div>
             <RuleList
               rules={state?.rules ?? []}

@@ -35,9 +35,11 @@ Frontend (PowerShell terminal 2):
 ```powershell
 cd frontend
 npm ci
-Copy-Item .env.example .env.local
 npm run dev -- --host 127.0.0.1
 ```
+
+The backend URLs work without an environment file. Copy `.env.example` to
+`.env.local` only when overriding the default local addresses.
 
 Open `http://127.0.0.1:5173`. The backend boots with the seven validated Review
 1 starter rules, so the demo is ready immediately after any restart. The
@@ -77,6 +79,9 @@ temperature cooling. **Unsafe cycle** proposes an evacuation-to-alarm feedback
 edge; the backend returns the exact cycle path and leaves the seven-rule graph
 unchanged. The complete timed talk track is in
 [`docs/demo-script.md`](docs/demo-script.md).
+
+Every official requirement and its test/demo evidence is mapped in
+[`docs/rubric-checklist.md`](docs/rubric-checklist.md).
 
 ## Git workflow
 

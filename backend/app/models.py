@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictFloat, StrictInt, StrictStr
@@ -105,6 +106,7 @@ class PerformanceSnapshot(BaseModel):
 
 class Snapshot(BaseModel):
     type: Literal["snapshot"] = "snapshot"
+    emitted_at_ms: int = Field(default_factory=lambda: int(time.time() * 1000))
     revision: int
     state: dict[str, ScalarValue]
     rules: list[Rule]

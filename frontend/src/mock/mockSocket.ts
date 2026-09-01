@@ -172,6 +172,7 @@ export class MockRuleMeshSocket {
     const { actuators, conflicts, active_chains } = evaluate(this.env, this.rules);
     const msg: StateMessage = {
       type: "state",
+      emitted_at_ms: Date.now(),
       revision: this.revision,
       seed: this.seed,
       environment: this.env,

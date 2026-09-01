@@ -12,21 +12,17 @@ npm install
 npm run dev
 ```
 
-Opens on the mock engine by default (`src/mock/`) — a client-side
-re-implementation of the active-proposal / arbitration / cycle-detection
-algorithm from the plan, so you can build and demo the whole UI without
-waiting on the backend. It ships with the 12 starter rules from section 8
-of the plan, a working "Start simulation" seed control, live sliders,
-rule creation, and cycle rejection.
+The integrated FastAPI backend is the default, even when no local environment
+file exists. The optional mock engine (`src/mock/`) is used only when
+`VITE_USE_MOCK=true`; it preserves an offline recovery path but is never part of
+the normal judged data path. Both modes use the same seven starter rules.
 
 ## Switching to the real backend
 
-Copy `.env.example` to `.env.local` and set `VITE_WS_URL` to Person A's
-`/ws/live` endpoint. `useRuleMeshSocket` then uses a real `WebSocket`
-instead of the mock — every component is written against the shared
-`ServerMessage` / `ClientCommand` contract in `src/types.ts`, so nothing
-else changes. **Get this file to Person A ASAP — it's the 0:00–0:30
-schema freeze.**
+The default URLs are `http://localhost:8000` and
+`ws://localhost:8000/ws/live`. Copy `.env.example` to `.env.local` only when
+those addresses need to be overridden. Every component is written against the
+shared `ServerMessage` / `ClientCommand` contract in `src/types.ts`.
 
 ## What's here
 

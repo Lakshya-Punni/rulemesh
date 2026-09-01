@@ -20,6 +20,7 @@ def test_websocket_receives_initial_snapshot() -> None:
         snapshot = websocket.receive_json()
 
     assert snapshot["type"] == "snapshot"
+    assert snapshot["emitted_at_ms"] > 0
     assert "revision" in snapshot
     assert "state" in snapshot
     assert "graph" in snapshot

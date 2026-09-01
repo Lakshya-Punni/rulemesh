@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { Rule } from "../types";
 
 interface RuleListProps {
@@ -26,7 +26,7 @@ export function RuleList({ rules, activeRuleNames, onToggle, onDelete, onUpdateP
       {sorted.length === 0 && <div className="empty-note">No rules yet.</div>}
       {sorted.map((rule) => (
         <RuleCard
-          key={rule.id}
+          key={`${rule.id}:${rule.priority}`}
           rule={rule}
           isActive={activeRuleNames.has(rule.name)}
           onToggle={onToggle}
@@ -51,22 +51,10 @@ interface RuleCardProps {
 function RuleCard({ rule, isActive, onToggle, onDelete, onUpdatePriority, commandsBusy }: RuleCardProps) {
   // Local draft so keystrokes don't fire a command per character — we only
   // send update_rule on blur/Enter, and only if the value actually changed.
-  // This matters for the two-session sync test in the plan (hours 11-13):
-  // the server's echoed revision is the only thing that ever finalizes the
-  // displayed priority, so if the prop value drifts (e.g. the other session
-  // edited it first) the draft below simply re-derives from it on the next
-  // render because React remounts nothing — the input just shows rule.priority
-  // again once the user isn't actively editing.
+  // The server's echoed revision is the only thing that finalizes the displayed
+  // priority. RuleCard is keyed by id + confirmed priority, so a change from
+  // either live session remounts this local draft with authoritative state.
   const [draft, setDraft] = useState(String(rule.priority));
-
-  // Resync the draft whenever the server-confirmed priority changes — either
-  // from our own committed edit round-tripping back, or from the *other*
-  // session editing the same rule. We deliberately don't guard this on
-  // "is the input focused" because the plan documents last-write-wins for
-  // concurrent same-rule edits; the server's value is always authoritative.
-  useEffect(() => {
-    setDraft(String(rule.priority));
-  }, [rule.priority]);
 
   function commit() {
     const parsed = Number(draft);
