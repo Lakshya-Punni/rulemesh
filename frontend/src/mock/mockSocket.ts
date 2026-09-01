@@ -110,7 +110,6 @@ export class MockRuleMeshSocket {
       for (const zone of ZONES) {
         const noise = (this.rand() - 0.5) * 2;
         nextEnv[`${zone}.temperature`] = clamp(Number(nextEnv[`${zone}.temperature`]) + noise * 0.3, 18, 40);
-        nextEnv[`${zone}.co2`] = clamp(Number(nextEnv[`${zone}.co2`]) + noise * 5, 400, 2000);
         if (zone === incidentZone && tick >= incidentAtTick) {
           const rampTicks = tick - incidentAtTick;
           nextEnv[`${zone}.smoke`] = clamp(rampTicks * 1.5, 0, 100);
@@ -120,7 +119,7 @@ export class MockRuleMeshSocket {
         }
       }
       this.env = nextEnv;
-      this.accepted += 50;
+      this.accepted += 2;
       this.broadcast();
     }, 100);
   }
@@ -144,7 +143,7 @@ export class MockRuleMeshSocket {
       active_chains,
       connected_sessions: this.connectedSessions,
       perf: {
-        events_per_second: this.tickHandle ? 500 : 0,
+        events_per_second: this.tickHandle ? 20 : 0,
         // p50/p95 are NOT measured here — they're overwritten by useRuleMeshSocket
         // with a real client-side render-latency measurement. See that hook.
         p50_latency_ms: 0,

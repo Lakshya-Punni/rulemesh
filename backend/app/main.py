@@ -5,8 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .graph import CycleDetectedError
-from .models import CycleError, EnvironmentUpdate, RuleCreate, Snapshot
-from .state import live_connections, runtime
+from .models import CycleError, EnvironmentUpdate, RuleCreate, RuleToggle, RuleUpdate, Snapshot
+from .state import RuleNotFoundError, live_connections, runtime
 
 
 app = FastAPI(title="RuleMesh API", version="0.1.0")
@@ -52,18 +52,60 @@ async def create_rule(request: RuleCreate) -> Snapshot | JSONResponse:
     return snapshot
 
 
+def cycle_response(error: CycleDetectedError) -> JSONResponse:
+    payload = CycleError(path=error.path, proposed_edges=error.proposed_edges)
+    return JSONResponse(status_code=422, content=payload.model_dump(mode="json"))
+
+
+@app.put("/api/rules/{rule_id}", response_model=Snapshot)
+async def update_rule(rule_id: str, request: RuleUpdate) -> Snapshot | JSONResponse:
+    try:
+        snapshot = await runtime.update_rule(rule_id, request)
+    except RuleNotFoundError as error:
+        raise HTTPException(status_code=404, detail=f"Rule not found: {rule_id}") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except CycleDetectedError as error:
+        return cycle_response(error)
+    await live_connections.broadcast(snapshot)
+    return snapshot
+
+
+@app.post("/api/rules/{rule_id}/toggle", response_model=Snapshot)
+async def toggle_rule(rule_id: str, request: RuleToggle) -> Snapshot:
+    try:
+        snapshot = await runtime.toggle_rule(rule_id, request.enabled)
+    except RuleNotFoundError as error:
+        raise HTTPException(status_code=404, detail=f"Rule not found: {rule_id}") from error
+    await live_connections.broadcast(snapshot)
+    return snapshot
+
+
+@app.delete("/api/rules/{rule_id}", response_model=Snapshot)
+async def delete_rule(rule_id: str) -> Snapshot:
+    try:
+        snapshot = await runtime.delete_rule(rule_id)
+    except RuleNotFoundError as error:
+        raise HTTPException(status_code=404, detail=f"Rule not found: {rule_id}") from error
+    await live_connections.broadcast(snapshot)
+    return snapshot
+
+
 @app.websocket("/ws/live")
 async def live_state(websocket: WebSocket) -> None:
     await live_connections.connect(websocket)
     try:
-        await websocket.send_json((await runtime.snapshot()).model_dump(mode="json"))
+        # Broadcast connection-count changes too, so every open dashboard shows
+        # the same multi-session state rather than only the newest browser.
+        await live_connections.broadcast(await runtime.snapshot())
         while True:
             message = await websocket.receive_text()
             if message == "ping":
                 await websocket.send_json({"type": "pong"})
     except WebSocketDisconnect:
-        live_connections.disconnect(websocket)
+        pass
     except Exception:
-        live_connections.disconnect(websocket)
         raise
-
+    finally:
+        live_connections.disconnect(websocket)
+        await live_connections.broadcast(await runtime.snapshot())

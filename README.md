@@ -20,6 +20,29 @@ rulemesh/
 `-- .gitignore
 ```
 
+## Run the integrated app
+
+Backend (PowerShell terminal 1):
+
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Frontend (PowerShell terminal 2):
+
+```powershell
+cd frontend
+npm ci
+Copy-Item .env.example .env.local
+npm run dev -- --host 127.0.0.1
+```
+
+Open `http://127.0.0.1:5173`, then click **Load starter rules**. The frontend
+uses REST for commands and treats `/ws/live` snapshots as the authoritative
+live state. Set `VITE_USE_MOCK=true` only when the backend is unavailable.
+
 ## Git workflow
 
 1. Keep `main` runnable.
@@ -36,4 +59,3 @@ Review checkpoints:
 - Hour 5: stable Review 1 build tagged `review-1`.
 - Hour 17: final feature freeze tagged `feature-freeze`.
 - Hour 24: final submission tagged `hackathon-final`.
-

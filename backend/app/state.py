@@ -6,7 +6,7 @@ from fastapi import WebSocket
 
 from .engine import recompute_state
 from .graph import CycleDetectedError, build_graph_snapshot, validate_acyclic
-from .models import Rule, RuleCreate, ScalarValue, Snapshot
+from .models import Rule, RuleCreate, RuleUpdate, ScalarValue, Snapshot
 from .variables import ACTUATOR_DEFAULTS, SENSOR_DEFAULTS, validate_environment_changes, validate_rule_create
 
 
@@ -35,6 +35,10 @@ class LiveConnections:
                 stale.append(websocket)
         for websocket in stale:
             self.disconnect(websocket)
+
+
+class RuleNotFoundError(Exception):
+    pass
 
 
 class RuntimeState:
@@ -67,6 +71,7 @@ class RuntimeState:
             graph=build_graph_snapshot(self.rules),
             active_rule_ids=list(self.active_rule_ids),
             conflicts=list(self.conflicts),
+            connected_sessions=live_connections.count,
         )
 
     async def snapshot(self) -> Snapshot:
@@ -97,10 +102,45 @@ class RuntimeState:
             self.revision += 1
             return self._snapshot()
 
+    async def update_rule(self, rule_id: str, update: RuleUpdate) -> Snapshot:
+        async with self.lock:
+            index = next((i for i, rule in enumerate(self.rules) if rule.id == rule_id), None)
+            if index is None:
+                raise RuleNotFoundError(rule_id)
+
+            current = self.rules[index]
+            candidate = Rule.model_validate(
+                {
+                    **current.model_dump(),
+                    **update.model_dump(exclude_none=True),
+                }
+            )
+            validate_rule_create(candidate)
+            remaining_rules = [rule for rule in self.rules if rule.id != rule_id]
+            validate_acyclic(remaining_rules, candidate)
+
+            self.rules[index] = candidate
+            self._recompute()
+            self.revision += 1
+            return self._snapshot()
+
+    async def toggle_rule(self, rule_id: str, enabled: bool) -> Snapshot:
+        return await self.update_rule(rule_id, RuleUpdate(enabled=enabled))
+
+    async def delete_rule(self, rule_id: str) -> Snapshot:
+        async with self.lock:
+            index = next((i for i, rule in enumerate(self.rules) if rule.id == rule_id), None)
+            if index is None:
+                raise RuleNotFoundError(rule_id)
+
+            self.rules.pop(index)
+            self._recompute()
+            self.revision += 1
+            return self._snapshot()
+
 
 runtime = RuntimeState()
 live_connections = LiveConnections()
 
 
-__all__ = ["CycleDetectedError", "live_connections", "runtime"]
-
+__all__ = ["CycleDetectedError", "RuleNotFoundError", "live_connections", "runtime"]

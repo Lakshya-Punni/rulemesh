@@ -65,6 +65,16 @@ Cycle rejection uses HTTP 422:
 }
 ```
 
+## Update, toggle, or delete a rule
+
+- `PUT /api/rules/{rule_id}` accepts any subset of the rule's editable fields.
+- `POST /api/rules/{rule_id}/toggle` accepts `{ "enabled": true | false }`.
+- `DELETE /api/rules/{rule_id}` removes the rule.
+
+Every successful mutation recomputes the engine, increments `revision`, and
+broadcasts the new snapshot. An update that introduces a cycle returns the same
+HTTP 422 payload as rule creation and leaves the saved graph unchanged.
+
 ## Live state
 
 `WS /ws/live`
@@ -82,7 +92,8 @@ The backend sends a snapshot immediately after connection and after every commit
     "edges": []
   },
   "active_rule_ids": [],
-  "conflicts": []
+  "conflicts": [],
+  "connected_sessions": 1
 }
 ```
 

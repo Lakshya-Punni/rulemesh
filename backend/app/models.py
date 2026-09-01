@@ -34,6 +34,22 @@ class RuleCreate(BaseModel):
     action: Action
 
 
+class RuleUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    enabled: bool | None = None
+    priority: int | None = Field(default=None, ge=0, le=100)
+    conditions: list[Condition] | None = Field(default=None, min_length=1, max_length=5)
+    action: Action | None = None
+
+
+class RuleToggle(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+
+
 class Rule(RuleCreate):
     id: str
     created_sequence: int
@@ -73,6 +89,7 @@ class Snapshot(BaseModel):
     graph: GraphSnapshot
     active_rule_ids: list[str]
     conflicts: list[ConflictRecord]
+    connected_sessions: int = 0
 
 
 class CycleError(BaseModel):
@@ -80,4 +97,3 @@ class CycleError(BaseModel):
     message: str = "The proposed rule creates a circular dependency."
     path: list[str]
     proposed_edges: list[dict[str, str]]
-

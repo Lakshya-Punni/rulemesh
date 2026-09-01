@@ -35,3 +35,79 @@ def test_environment_update_is_pushed_to_live_session() -> None:
     assert response.json()["state"]["laboratory.smoke"] == 42.0
     assert pushed["state"]["laboratory.smoke"] == 42.0
     assert pushed["revision"] == response.json()["revision"]
+
+
+def test_rule_update_toggle_and_delete() -> None:
+    created = client.post(
+        "/api/rules",
+        json={
+            "name": "API CRUD test",
+            "enabled": True,
+            "priority": 20,
+            "conditions": [
+                {"variable": "laboratory.temperature", "operator": ">", "value": 30}
+            ],
+            "action": {"target": "laboratory.hvac", "value": "cool"},
+        },
+    )
+    assert created.status_code == 200
+    rule_id = created.json()["rules"][-1]["id"]
+
+    updated = client.put(f"/api/rules/{rule_id}", json={"priority": 75})
+    assert updated.status_code == 200
+    updated_rule = next(rule for rule in updated.json()["rules"] if rule["id"] == rule_id)
+    assert updated_rule["priority"] == 75
+
+    toggled = client.post(f"/api/rules/{rule_id}/toggle", json={"enabled": False})
+    assert toggled.status_code == 200
+    toggled_rule = next(rule for rule in toggled.json()["rules"] if rule["id"] == rule_id)
+    assert toggled_rule["enabled"] is False
+
+    deleted = client.delete(f"/api/rules/{rule_id}")
+    assert deleted.status_code == 200
+    assert all(rule["id"] != rule_id for rule in deleted.json()["rules"])
+
+
+def test_rule_update_rejects_cycle_without_mutating_saved_rule() -> None:
+    first = client.post(
+        "/api/rules",
+        json={
+            "name": "Cycle update source",
+            "enabled": True,
+            "priority": 50,
+            "conditions": [{"variable": "laboratory.smoke", "operator": ">", "value": 70}],
+            "action": {"target": "laboratory.alarm", "value": True},
+        },
+    )
+    first_id = first.json()["rules"][-1]["id"]
+    second = client.post(
+        "/api/rules",
+        json={
+            "name": "Cycle update target",
+            "enabled": True,
+            "priority": 50,
+            "conditions": [{"variable": "laboratory.alarm", "operator": "==", "value": True}],
+            "action": {"target": "building.evacuation", "value": True},
+        },
+    )
+    second_id = second.json()["rules"][-1]["id"]
+
+    rejected = client.put(
+        f"/api/rules/{first_id}",
+        json={
+            "conditions": [
+                {"variable": "building.evacuation", "operator": "==", "value": True}
+            ]
+        },
+    )
+    assert rejected.status_code == 422
+    assert rejected.json()["code"] == "CYCLE_DETECTED"
+    assert rejected.json()["path"][0] == rejected.json()["path"][-1]
+
+    with client.websocket_connect("/ws/live") as websocket:
+        snapshot = websocket.receive_json()
+    saved = next(rule for rule in snapshot["rules"] if rule["id"] == first_id)
+    assert saved["conditions"][0]["variable"] == "laboratory.smoke"
+
+    client.delete(f"/api/rules/{second_id}")
+    client.delete(f"/api/rules/{first_id}")

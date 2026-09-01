@@ -14,95 +14,85 @@ import type {
   CycleError,
 } from "../types";
 
-export const ZONES = ["laboratory", "server_room", "lobby", "warehouse", "office"] as const;
+export const ZONES = ["laboratory"] as const;
 
-export const GLOBAL_KEYS = ["building.evacuation", "quiet_hours"] as const;
+export const GLOBAL_KEYS = ["building.evacuation", "building.quiet_hours"] as const;
 
 function defaultEnvironment(): EnvironmentState {
-  const env: EnvironmentState = {};
-  for (const zone of ZONES) {
-    env[`${zone}.smoke`] = 5;
-    env[`${zone}.temperature`] = 21;
-    env[`${zone}.occupancy`] = 0;
-    env[`${zone}.co2`] = 420;
-    env[`${zone}.door_open`] = false;
-  }
-  env["building.evacuation"] = false;
-  env["quiet_hours"] = false;
-  return env;
+  return {
+    "laboratory.smoke": 0,
+    "laboratory.temperature": 24,
+    "building.quiet_hours": false,
+  };
 }
 
 function defaultActuatorDefaults(): EnvironmentState {
-  const act: EnvironmentState = {};
-  for (const zone of ZONES) {
-    act[`${zone}.alarm`] = false;
-    act[`${zone}.hvac`] = "idle";
-    act[`${zone}.exit_locked`] = true;
-    act[`${zone}.sprinkler`] = false;
-    act[`${zone}.emergency_lights`] = false;
-  }
-  return act;
+  return {
+    "laboratory.alarm": false,
+    "laboratory.hvac": "off",
+    "laboratory.exit_locked": true,
+    "laboratory.emergency_lights": false,
+    "building.evacuation": false,
+  };
 }
 
 export function starterRules(): Rule[] {
-  let seq = 1;
-  const rules: Omit<Rule, "id" | "created_sequence">[] = [];
-  for (const zone of ZONES) {
-    rules.push(
-      {
-        name: `${zone}: smoke -> alarm`,
-        enabled: true,
-        priority: 90,
-        conditions: [{ variable: `${zone}.smoke`, operator: ">", value: 70 }],
-        action: { target: `${zone}.alarm`, value: true },
-      },
-      {
-        name: `${zone}: alarm -> evacuation`,
-        enabled: true,
-        priority: 90,
-        conditions: [{ variable: `${zone}.alarm`, operator: "==", value: true }],
-        action: { target: "building.evacuation", value: true },
-      },
-      {
-        name: `${zone}: smoke -> hvac off`,
-        enabled: true,
-        priority: 90,
-        conditions: [{ variable: `${zone}.smoke`, operator: ">", value: 60 }],
-        action: { target: `${zone}.hvac`, value: "off" },
-      },
-      {
-        name: `${zone}: temperature -> hvac cool`,
-        enabled: true,
-        priority: 40,
-        conditions: [{ variable: `${zone}.temperature`, operator: ">", value: 32 }],
-        action: { target: `${zone}.hvac`, value: "cool" },
-      },
-      {
-        name: `${zone}: quiet hours -> alarm off`,
-        enabled: true,
-        priority: 10,
-        conditions: [{ variable: "quiet_hours", operator: "==", value: true }],
-        action: { target: `${zone}.alarm`, value: false },
-      },
-    );
-  }
-  rules.push(
+  const rules: Omit<Rule, "id" | "created_sequence">[] = [
     {
-      name: "evacuation -> unlock exits",
+      name: "Fire alarm",
+      enabled: true,
+      priority: 90,
+      conditions: [{ variable: "laboratory.smoke", operator: ">", value: 70 }],
+      action: { target: "laboratory.alarm", value: true },
+    },
+    {
+      name: "Evacuate",
+      enabled: true,
+      priority: 90,
+      conditions: [{ variable: "laboratory.alarm", operator: "==", value: true }],
+      action: { target: "building.evacuation", value: true },
+    },
+    {
+      name: "Unlock exits",
       enabled: true,
       priority: 100,
       conditions: [{ variable: "building.evacuation", operator: "==", value: true }],
-      action: { target: "building.exit_locked", value: false },
+      action: { target: "laboratory.exit_locked", value: false },
     },
     {
-      name: "evacuation -> emergency lights",
+      name: "Emergency lights",
       enabled: true,
       priority: 80,
       conditions: [{ variable: "building.evacuation", operator: "==", value: true }],
-      action: { target: "building.emergency_lights", value: true },
+      action: { target: "laboratory.emergency_lights", value: true },
     },
-  );
-  return rules.map((r) => ({ ...r, id: `rule-${seq}`, created_sequence: seq++ }));
+    {
+      name: "Smoke shutdown",
+      enabled: true,
+      priority: 90,
+      conditions: [{ variable: "laboratory.smoke", operator: ">", value: 60 }],
+      action: { target: "laboratory.hvac", value: "off" },
+    },
+    {
+      name: "Temperature cooling",
+      enabled: true,
+      priority: 40,
+      conditions: [{ variable: "laboratory.temperature", operator: ">", value: 32 }],
+      action: { target: "laboratory.hvac", value: "cool" },
+    },
+    {
+      name: "Quiet hours",
+      enabled: true,
+      priority: 10,
+      conditions: [{ variable: "building.quiet_hours", operator: "==", value: true }],
+      action: { target: "laboratory.alarm", value: false },
+    },
+  ];
+  return rules.map((rule, index) => ({
+    ...rule,
+    id: `rule-${index + 1}`,
+    created_sequence: index + 1,
+  }));
 }
 
 function evalCondition(cond: Condition, env: EnvironmentState): boolean {

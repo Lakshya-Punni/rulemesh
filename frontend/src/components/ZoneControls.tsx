@@ -18,7 +18,7 @@ const ZONE_LABELS: Record<string, string> = {
 };
 
 export function ZoneControls({ environment, selectedZone, onZoneChange, onSetManual, onReset }: ZoneControlsProps) {
-  const quietHours = Boolean(environment?.["quiet_hours"]);
+  const quietHours = Boolean(environment?.["building.quiet_hours"]);
 
   return (
     <div className="panel">
@@ -69,7 +69,7 @@ export function ZoneControls({ environment, selectedZone, onZoneChange, onSetMan
         <input
           type="checkbox"
           checked={quietHours}
-          onChange={(e) => onSetManual("quiet_hours", e.target.checked)}
+          onChange={(e) => onSetManual("building.quiet_hours", e.target.checked)}
         />
       </div>
     </div>
