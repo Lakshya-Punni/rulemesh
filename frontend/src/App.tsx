@@ -223,6 +223,7 @@ function App() {
             onZoneChange={setSelectedZone}
             onSetManual={(variable, value) => send({ type: "set_manual", variable, value })}
             onReset={handleResetDemo}
+            onDemoStage={(stage) => send({ type: "run_demo_stage", stage })}
             commandsBusy={commandsBusy}
           />
           <SensorChart zoneLabel={ZONE_LABELS[selectedZone]} samples={sensorHistory} />

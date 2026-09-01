@@ -206,6 +206,67 @@
 
 /* ---------- Zone controls ---------- */
 
+.guided-demo {
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 12px;
+  background: linear-gradient(145deg, var(--panel) 20%, var(--accent-cyan-dim));
+}
+
+.guided-demo__heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.guided-demo__heading span:last-child {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 400;
+  color: var(--text-faint);
+}
+
+.guided-demo__buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.btn--scenario {
+  padding: 6px 8px;
+  text-align: left;
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.btn--scenario-heat {
+  border-color: var(--accent-amber);
+  color: var(--accent-amber);
+}
+
+.btn--scenario-fire {
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+}
+
+.btn--scenario-safety {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+.guided-demo__note {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
 .zone-block {
   border: 1px solid var(--border);
   border-radius: 6px;

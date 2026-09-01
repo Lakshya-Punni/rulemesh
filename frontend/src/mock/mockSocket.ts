@@ -100,6 +100,35 @@ export class MockRuleMeshSocket {
         this.rejected = 0;
         break;
       }
+      case "run_demo_stage": {
+        this.stopSimulation();
+        this.seed = null;
+        const stages: Record<typeof command.stage, EnvironmentState> = {
+          normal: {
+            "laboratory.smoke": 0,
+            "laboratory.temperature": 24,
+            "building.quiet_hours": false,
+          },
+          heat: {
+            "laboratory.smoke": 10,
+            "laboratory.temperature": 38,
+            "building.quiet_hours": false,
+          },
+          fire: {
+            "laboratory.smoke": 85,
+            "laboratory.temperature": 43,
+            "building.quiet_hours": false,
+          },
+          safety_override: {
+            "laboratory.smoke": 85,
+            "laboratory.temperature": 43,
+            "building.quiet_hours": true,
+          },
+        };
+        this.env = stages[command.stage];
+        this.accepted += 3;
+        break;
+      }
       case "acknowledge_alert":
         break;
     }

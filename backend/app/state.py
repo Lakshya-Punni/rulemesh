@@ -122,6 +122,20 @@ class RuntimeState:
             self.revision += 1
             return self._snapshot()
 
+    async def apply_demo_stage(self, changes: dict[str, ScalarValue]) -> Snapshot:
+        """Apply a complete guided-demo sensor state in one revision."""
+        validate_environment_changes(changes)
+        async with self.lock:
+            self.simulation_running = False
+            self.simulation_seed = None
+            self.sensor_values.update(changes)
+            now = time.monotonic()
+            self.event_times.extend(now for _ in changes)
+            self.accepted_events += len(changes)
+            self._recompute()
+            self.revision += 1
+            return self._snapshot()
+
     async def set_simulation_status(self, running: bool, seed: int | None = None) -> Snapshot:
         async with self.lock:
             changed = self.simulation_running != running

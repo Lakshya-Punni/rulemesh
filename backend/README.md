@@ -28,6 +28,8 @@ pytest
 - NetworkX dependency graph and exact cycle-path rejection
 - Priority-based conflict arbitration with visible proposals
 - In-memory authoritative state
-- Environment and rule-creation APIs
+- Environment and complete rule CRUD APIs
 - Live WebSocket snapshots
-- Backend tests for chains, retraction, conflicts, cycles, health, and WebSockets
+- Deterministic server-owned simulation and atomic guided-demo stages
+- Backend tests for chains, retraction, conflicts, cycles, two-session sync,
+  reset recovery, guided stages, health, and WebSockets

@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from .graph import CycleDetectedError
 from .models import (
     CycleError,
+    DemoStageRequest,
     EnvironmentUpdate,
     RuleCreate,
     RuleToggle,
@@ -118,6 +119,11 @@ async def stop_simulation() -> Snapshot:
 @app.post("/api/demo/reset", response_model=Snapshot)
 async def reset_demo() -> Snapshot:
     return await simulation.reset_demo()
+
+
+@app.post("/api/demo/stage", response_model=Snapshot)
+async def apply_demo_stage(request: DemoStageRequest) -> Snapshot:
+    return await simulation.apply_demo_stage(request.stage)
 
 
 @app.websocket("/ws/live")

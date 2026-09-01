@@ -281,3 +281,42 @@ def test_judge_demo_flow_stays_consistent_across_two_live_sessions() -> None:
                     "accepted_events": 0,
                     "rejected_events": 0,
                 }
+
+
+def test_guided_demo_stages_are_atomic_and_cancel_the_simulator() -> None:
+    with TestClient(app) as demo_client:
+        demo_client.post("/api/demo/reset")
+
+        heat = demo_client.post("/api/demo/stage", json={"stage": "heat"})
+        assert heat.status_code == 200
+        assert heat.json()["state"]["laboratory.hvac"] == "cool"
+        assert heat.json()["active_rule_ids"] == ["rule-6"]
+        assert heat.json()["conflicts"] == []
+
+        demo_client.post("/api/simulation/start", json={"seed": 42})
+        safety = demo_client.post(
+            "/api/demo/stage",
+            json={"stage": "safety_override"},
+        )
+        assert safety.status_code == 200
+        safety_snapshot = safety.json()
+        assert safety_snapshot["simulation_running"] is False
+        assert safety_snapshot["simulation_seed"] is None
+        assert safety_snapshot["state"]["laboratory.alarm"] is True
+        assert safety_snapshot["state"]["building.evacuation"] is True
+        assert safety_snapshot["state"]["laboratory.hvac"] == "off"
+        winners = {
+            conflict["target"]: conflict["winner"]["rule_name"]
+            for conflict in safety_snapshot["conflicts"]
+        }
+        assert winners == {
+            "laboratory.alarm": "Fire alarm",
+            "laboratory.hvac": "Smoke shutdown",
+        }
+
+        normal = demo_client.post("/api/demo/stage", json={"stage": "normal"})
+        assert normal.status_code == 200
+        assert normal.json()["active_rule_ids"] == []
+        assert normal.json()["conflicts"] == []
+        assert normal.json()["state"]["laboratory.alarm"] is False
+        assert normal.json()["state"]["laboratory.exit_locked"] is True

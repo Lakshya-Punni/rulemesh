@@ -53,6 +53,20 @@ Use **Reset demo** before each rehearsal. It stops the shared simulator,
 restores the seven starter rules and sensor defaults, clears metrics and UI
 history, and synchronizes that clean state to every open dashboard.
 
+For a fast presentation, use the **60-second judge path** instead of waiting
+for the simulator:
+
+1. **Normal** — no proposals are active.
+2. **Heat** — temperature cooling proposes `HVAC = cool`.
+3. **Fire** — the alarm/evacuation/unlock/lights chain activates and smoke
+   shutdown defeats temperature cooling on the HVAC target.
+4. **Safety override** — quiet hours also proposes `alarm = false`, but the
+   higher-priority fire rule wins, preserving evacuation.
+5. Return to **Normal** to show that every active proposal retracts cleanly.
+
+Each stage is one atomic backend revision, stops any running simulation, and is
+broadcast to every live dashboard.
+
 ## Git workflow
 
 1. Keep `main` runnable.

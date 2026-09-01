@@ -67,6 +67,15 @@ class SimulationStart(BaseModel):
     seed: int
 
 
+DemoStageName = Literal["normal", "heat", "fire", "safety_override"]
+
+
+class DemoStageRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    stage: DemoStageName
+
+
 class ProposalSummary(BaseModel):
     rule_id: str
     rule_name: str

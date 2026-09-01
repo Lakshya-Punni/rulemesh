@@ -4,6 +4,8 @@ import asyncio
 import random
 from contextlib import suppress
 
+from .demo_stages import DEMO_STAGE_CHANGES
+from .models import DemoStageName
 from .models import Snapshot
 from .state import live_connections, runtime
 
@@ -28,6 +30,12 @@ class SimulationController:
     async def reset_demo(self) -> Snapshot:
         await self._cancel_task()
         snapshot = await runtime.reset_demo()
+        await live_connections.broadcast(snapshot)
+        return snapshot
+
+    async def apply_demo_stage(self, stage: DemoStageName) -> Snapshot:
+        await self._cancel_task()
+        snapshot = await runtime.apply_demo_stage(DEMO_STAGE_CHANGES[stage])
         await live_connections.broadcast(snapshot)
         return snapshot
 

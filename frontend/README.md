@@ -38,12 +38,11 @@ schema freeze.**
   `ConflictPanel`, `CycleBanner`, `RuleList`, `RuleForm`,
   `DependencyGraph` (React Flow).
 
-## Still to do (per plan, hours 5+)
+## Integrated demo features
 
-- Wire real WS URL once Person A's `/ws/live` is up; drop the mock or
-  keep it for offline dev.
-- Selected-zone filtering exists on the graph — extend to actuator grid
-  if it gets crowded with 5 zones × 5 actuators.
-- Execution trace / active-chain animation polish (hours 13–15).
-- Two-session revision-sync testing once the backend's command queue
-  exists (hours 11–13).
+- Real REST commands plus authoritative `/ws/live` snapshots and reconnection.
+- Active-chain graph highlighting, sensor history, and execution trace.
+- Visible conflict winners/losers and exact rejected cycle paths.
+- Server-owned deterministic simulation shared by every browser session.
+- Atomic four-stage judge path, reset recovery, command progress, and success
+  feedback.

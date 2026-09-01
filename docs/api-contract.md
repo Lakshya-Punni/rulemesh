@@ -125,6 +125,21 @@ restores the default sensor values and all seven validated starter rules, clears
 performance counters, increments the revision, and broadcasts the clean
 snapshot to every connected browser.
 
+## Guided demo stage
+
+`POST /api/demo/stage`
+
+```json
+{ "stage": "safety_override" }
+```
+
+Allowed stages are `normal`, `heat`, `fire`, and `safety_override`. A stage
+cancels the free-running simulator, clears its seed, atomically applies a full
+three-sensor snapshot, evaluates the complete rule graph, increments the
+revision once, and broadcasts the result. `safety_override` intentionally
+creates conflicts on both `laboratory.alarm` and `laboratory.hvac`; the safety
+rules win by priority.
+
 When contradictory active rules write the same actuator, `conflicts` contains:
 
 ```json

@@ -94,6 +94,10 @@ function commandFeedback(command: ClientCommand): { pending: string; success: st
       return { pending: "Resetting environment…", success: "Environment reset." };
     case "reset_demo":
       return { pending: "Restoring the judge demo…", success: "Demo restored to its known-good state." };
+    case "run_demo_stage": {
+      const label = command.stage === "safety_override" ? "Safety override" : command.stage[0].toUpperCase() + command.stage.slice(1);
+      return { pending: `Applying ${label} stage…`, success: `${label} stage is live.` };
+    }
     case "acknowledge_alert":
       return { pending: "Acknowledging alert…", success: "Alert acknowledged." };
   }
@@ -343,6 +347,10 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
           return await sendEnvironmentChanges(RESET_ENVIRONMENT);
         case "reset_demo":
           path = "/api/demo/reset";
+          break;
+        case "run_demo_stage":
+          path = "/api/demo/stage";
+          body = { stage: command.stage };
           break;
         case "acknowledge_alert":
           return true;

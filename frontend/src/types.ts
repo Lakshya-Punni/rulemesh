@@ -30,6 +30,8 @@ export type RuleDraft = Omit<Rule, "id" | "created_sequence">;
 
 export type EnvironmentState = Record<string, number | boolean | string>;
 
+export type DemoStage = "normal" | "heat" | "fire" | "safety_override";
+
 export interface ProposalResult {
   rule_id: string;
   rule_name: string;
@@ -93,6 +95,7 @@ export type ClientCommand =
   | { type: "set_manual"; variable: string; value: number | boolean | string }
   | { type: "reset_environment" }
   | { type: "reset_demo" }
+  | { type: "run_demo_stage"; stage: DemoStage }
   | { type: "acknowledge_alert"; id: string };
 
 export type ConnectionStatus = "connecting" | "open" | "closed" | "error";
