@@ -35,6 +35,12 @@ export function Header({
 
   const p95 = perf?.p95_latency_ms ?? 0;
   const p95Class = p95 === 0 ? "" : p95 < 150 ? "stat__value--good" : p95 < 200 ? "stat__value--warn" : "stat__value--bad";
+  const eventsPerSecond = perf?.events_per_second ?? 0;
+  const throughputTarget = perf?.target_events_per_second ?? 500;
+  const slaPass = isRunning && eventsPerSecond >= throughputTarget && p95 > 0 && p95 < 200;
+  const slaWarming = isRunning && !slaPass && (perf?.accepted_events ?? 0) < throughputTarget * 2;
+  const slaState = !isRunning ? "idle" : slaPass ? "pass" : slaWarming ? "warming" : "fail";
+  const slaLabel = !isRunning ? "LOAD READY" : slaPass ? "SLA PASS" : slaWarming ? "WARMING UP" : "BELOW TARGET";
 
   return (
     <header className="header">
@@ -46,6 +52,11 @@ export function Header({
       <div className="connection">
         <span className={`connection__dot connection__dot--${status}`} />
         {STATUS_LABEL[status]}
+      </div>
+
+      <div className={`sla-badge sla-badge--${slaState}`} aria-label="Live throughput and latency service level">
+        <span>{slaLabel}</span>
+        <span>{eventsPerSecond} / {throughputTarget} EPS · {p95} ms p95</span>
       </div>
 
       <div className="sim-controls">
@@ -86,7 +97,9 @@ export function Header({
         </div>
         <div className="stat">
           <span className="stat__label">Events/s</span>
-          <span className="stat__value">{perf?.events_per_second ?? 0}</span>
+          <span className={`stat__value ${eventsPerSecond >= throughputTarget ? "stat__value--good" : ""}`}>
+            {eventsPerSecond}
+          </span>
         </div>
         <div className="stat">
           <span className="stat__label">p95 latency</span>

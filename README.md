@@ -46,8 +46,12 @@ authoritative live state. Set `VITE_USE_MOCK=true` only when the backend is
 unavailable.
 
 The deterministic incident simulator also runs in the backend. Starting seed
-`42` in either browser drives one shared 10 Hz scenario and reports the real
-20 sensor events/second in every connected session.
+`42` in either browser drives one shared 10 Hz scenario. Each tick processes an
+ordered micro-batch of 60 sensor samples, sustaining roughly 600 events/second,
+then pushes one authoritative state revision to every connected session. The
+header shows live EPS, the 500-EPS target, measured browser p95 latency, and an
+**SLA PASS** badge only when throughput is at least 500 EPS and p95 is below
+200 ms.
 
 Use **Reset demo** before each rehearsal. It stops the shared simulator,
 restores the seven starter rules and sensor defaults, clears metrics and UI

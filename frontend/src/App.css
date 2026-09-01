@@ -83,6 +83,51 @@
 .connection__dot--connecting { background: var(--accent-amber); box-shadow: 0 0 0 3px var(--accent-amber-dim); }
 .connection__dot--closed, .connection__dot--error { background: var(--accent-red); box-shadow: 0 0 0 3px var(--accent-red-dim); }
 
+.sla-badge {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 138px;
+  padding: 5px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+}
+
+.sla-badge span:first-child {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.sla-badge span:last-child {
+  font-size: 9.5px;
+  color: var(--text-muted);
+}
+
+.sla-badge--idle {
+  color: var(--text-muted);
+  background: var(--panel-raised);
+}
+
+.sla-badge--warming {
+  color: var(--accent-amber);
+  border-color: var(--accent-amber);
+  background: var(--accent-amber-dim);
+}
+
+.sla-badge--pass {
+  color: var(--accent-green);
+  border-color: var(--accent-green);
+  background: var(--accent-green-dim);
+}
+
+.sla-badge--fail {
+  color: var(--accent-red);
+  border-color: var(--accent-red);
+  background: var(--accent-red-dim);
+}
+
 .sim-controls {
   display: flex;
   align-items: center;

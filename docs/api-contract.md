@@ -98,6 +98,7 @@ The backend sends a snapshot immediately after connection and after every commit
   "simulation_seed": null,
   "perf": {
     "events_per_second": 0,
+    "target_events_per_second": 500,
     "accepted_events": 0,
     "rejected_events": 0
   }
@@ -113,10 +114,21 @@ The backend sends a snapshot immediately after connection and after every commit
 ```
 
 `POST /api/simulation/stop` takes no request body. The simulator runs in the
-backend at 10 ticks per second and atomically updates smoke and temperature,
-which produces 20 sensor events per second. The seed, running status, metrics,
-and resulting engine state are identical in every connected browser. Starting
-a new seed cancels the previous simulation task before launching the next one.
+backend at 10 ticks per second. Every tick applies an ordered micro-batch of 60
+smoke and temperature samples as one graph revision, sustaining approximately
+600 input events per second while limiting interface pushes to 10 snapshots per
+second. The seed, running status, metrics, and resulting engine state are
+identical in every connected browser. Starting a new seed cancels the previous
+simulation task before launching the next one.
+
+`perf.target_events_per_second` is `500`. The frontend measures render latency
+from receipt of an authoritative WebSocket snapshot through two animation
+frames and reports rolling p50/p95 values. Its SLA badge passes only when live
+throughput is at least 500 EPS and p95 latency is below 200 ms.
+
+Concurrent commands commit under the runtime lock. Broadcasts are serialized,
+obsolete revisions are dropped server-side, and clients also reject any stale
+revision, preventing a delayed response from rolling either session backward.
 
 ## Reset demo
 

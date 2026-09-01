@@ -61,6 +61,7 @@ export interface ActiveChain {
 
 export interface PerfStats {
   events_per_second: number;
+  target_events_per_second: number;
   p50_latency_ms: number;
   p95_latency_ms: number;
   accepted_events: number;

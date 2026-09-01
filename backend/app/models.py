@@ -98,6 +98,7 @@ class GraphSnapshot(BaseModel):
 
 class PerformanceSnapshot(BaseModel):
     events_per_second: int = 0
+    target_events_per_second: int = 500
     accepted_events: int = 0
     rejected_events: int = 0
 

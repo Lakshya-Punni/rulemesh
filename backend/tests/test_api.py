@@ -1,4 +1,5 @@
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi.testclient import TestClient
 
@@ -126,20 +127,21 @@ def test_rule_update_rejects_cycle_without_mutating_saved_rule() -> None:
 
 def test_simulation_is_server_owned_and_reports_real_event_counts() -> None:
     with TestClient(app) as simulation_client:
-        before = simulation_client.post("/api/simulation/stop").json()
+        before = simulation_client.post("/api/demo/reset").json()
         started = simulation_client.post("/api/simulation/start", json={"seed": 42})
         assert started.status_code == 200
         assert started.json()["simulation_running"] is True
         assert started.json()["simulation_seed"] == 42
 
-        time.sleep(0.25)
+        time.sleep(1.15)
         stopped = simulation_client.post("/api/simulation/stop")
 
     assert stopped.status_code == 200
     assert stopped.json()["simulation_running"] is False
     assert stopped.json()["simulation_seed"] == 42
-    assert stopped.json()["perf"]["accepted_events"] >= before["perf"]["accepted_events"] + 2
-    assert stopped.json()["perf"]["events_per_second"] >= 2
+    assert stopped.json()["perf"]["target_events_per_second"] == 500
+    assert stopped.json()["perf"]["accepted_events"] >= before["perf"]["accepted_events"] + 600
+    assert stopped.json()["perf"]["events_per_second"] >= 500
 
 
 def test_demo_reset_restores_a_clean_known_state() -> None:
@@ -164,6 +166,7 @@ def test_demo_reset_restores_a_clean_known_state() -> None:
     assert [rule["id"] for rule in snapshot["rules"]] == [f"rule-{index}" for index in range(1, 8)]
     assert snapshot["perf"] == {
         "events_per_second": 0,
+        "target_events_per_second": 500,
         "accepted_events": 0,
         "rejected_events": 0,
     }
@@ -278,6 +281,7 @@ def test_judge_demo_flow_stays_consistent_across_two_live_sessions() -> None:
                 assert reset_first["active_rule_ids"] == []
                 assert reset_first["perf"] == {
                     "events_per_second": 0,
+                    "target_events_per_second": 500,
                     "accepted_events": 0,
                     "rejected_events": 0,
                 }
@@ -320,3 +324,62 @@ def test_guided_demo_stages_are_atomic_and_cancel_the_simulator() -> None:
         assert normal.json()["conflicts"] == []
         assert normal.json()["state"]["laboratory.alarm"] is False
         assert normal.json()["state"]["laboratory.exit_locked"] is True
+
+
+def test_simultaneous_commands_remain_ordered_in_two_live_sessions() -> None:
+    with TestClient(app) as concurrency_client:
+        concurrency_client.post("/api/demo/reset")
+
+        with concurrency_client.websocket_connect("/ws/live") as first_session:
+            first_session.receive_json()
+            with concurrency_client.websocket_connect("/ws/live") as second_session:
+                first_session.receive_json()
+                second_session.receive_json()
+
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    smoke_future = executor.submit(
+                        concurrency_client.post,
+                        "/api/environment",
+                        json={"changes": {"laboratory.smoke": 80.0}},
+                    )
+                    temperature_future = executor.submit(
+                        concurrency_client.post,
+                        "/api/environment",
+                        json={"changes": {"laboratory.temperature": 36.0}},
+                    )
+                    smoke_response = smoke_future.result(timeout=3)
+                    temperature_response = temperature_future.result(timeout=3)
+
+                assert smoke_response.status_code == 200
+                assert temperature_response.status_code == 200
+
+                # This third, non-overwriting command is a deterministic fence:
+                # its revision can only be produced after both concurrent
+                # commands have committed under the runtime lock.
+                fence = concurrency_client.post(
+                    "/api/environment",
+                    json={"changes": {"building.quiet_hours": False}},
+                )
+                target_revision = fence.json()["revision"]
+
+                def receive_through_fence(websocket) -> tuple[list[int], dict]:
+                    revisions: list[int] = []
+                    for _ in range(3):
+                        message = websocket.receive_json()
+                        revisions.append(message["revision"])
+                        if message["revision"] == target_revision:
+                            return revisions, message
+                    raise AssertionError("The fenced revision was not delivered")
+
+                first_revisions, first_final = receive_through_fence(first_session)
+                second_revisions, second_final = receive_through_fence(second_session)
+
+                assert first_revisions == sorted(first_revisions)
+                assert second_revisions == sorted(second_revisions)
+                assert first_final["revision"] == second_final["revision"] == target_revision
+                assert first_final["state"] == second_final["state"]
+                assert first_final["state"]["laboratory.smoke"] == 80.0
+                assert first_final["state"]["laboratory.temperature"] == 36.0
+                assert first_final["state"]["laboratory.hvac"] == "off"
+
+        concurrency_client.post("/api/demo/reset")

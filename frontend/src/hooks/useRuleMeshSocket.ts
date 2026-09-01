@@ -50,6 +50,7 @@ interface BackendSnapshot {
   simulation_seed?: number | null;
   perf?: {
     events_per_second: number;
+    target_events_per_second?: number;
     accepted_events: number;
     rejected_events: number;
   };
@@ -152,6 +153,10 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
 
   const handleBackendSnapshot = useCallback(
     (snapshot: BackendSnapshot) => {
+      // Concurrent REST commands may complete close together. Never let a
+      // delayed older frame roll a live dashboard back to a stale revision.
+      if (snapshot.revision < (stateRef.current?.revision ?? -1)) return;
+
       const environment: EnvironmentState = {};
       const actuators: EnvironmentState = {};
       for (const [key, value] of Object.entries(snapshot.state)) {
@@ -185,6 +190,7 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
         simulation_running: snapshot.simulation_running ?? false,
         perf: {
           events_per_second: snapshot.perf?.events_per_second ?? 0,
+          target_events_per_second: snapshot.perf?.target_events_per_second ?? 500,
           p50_latency_ms: 0,
           p95_latency_ms: 0,
           accepted_events: snapshot.perf?.accepted_events ?? 0,

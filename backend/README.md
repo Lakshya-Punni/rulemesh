@@ -30,6 +30,8 @@ pytest
 - In-memory authoritative state
 - Environment and complete rule CRUD APIs
 - Live WebSocket snapshots
-- Deterministic server-owned simulation and atomic guided-demo stages
+- Deterministic 500+ EPS server-owned simulation using ordered micro-batches
+- Serialized monotonic WebSocket broadcasts across concurrent sessions
+- Atomic guided-demo stages
 - Backend tests for chains, retraction, conflicts, cycles, two-session sync,
   reset recovery, guided stages, health, and WebSockets

@@ -10,6 +10,10 @@ from .models import Snapshot
 from .state import live_connections, runtime
 
 
+SIMULATION_TICK_SECONDS = 0.1
+SIMULATION_EVENTS_PER_BATCH = 60
+
+
 class SimulationController:
     def __init__(self) -> None:
         self._task: asyncio.Task[None] | None = None
@@ -52,24 +56,31 @@ class SimulationController:
         random_source = random.Random(seed)
         incident_tick = 18 + random_source.randrange(12)
         tick = 0
+        loop = asyncio.get_running_loop()
+        next_tick_at = loop.time()
         try:
             while True:
                 tick += 1
-                if tick < incident_tick:
-                    smoke = round(random_source.random() * 8)
-                    temperature = 24 + random_source.random() * 2
-                else:
-                    smoke = min(95, (tick - incident_tick) * 6)
-                    temperature = min(45, 26 + (tick - incident_tick) * 1.2)
+                events = []
+                for event_index in range(SIMULATION_EVENTS_PER_BATCH):
+                    phase = tick + event_index / SIMULATION_EVENTS_PER_BATCH
+                    if phase < incident_tick:
+                        smoke = round(random_source.random() * 8, 2)
+                        temperature = round(24 + random_source.random() * 2, 2)
+                    else:
+                        incident_progress = phase - incident_tick
+                        smoke = round(min(95, incident_progress * 6), 2)
+                        temperature = round(min(45, 26 + incident_progress * 1.2), 2)
 
-                snapshot = await runtime.update_environment(
-                    {
-                        "laboratory.smoke": smoke,
-                        "laboratory.temperature": temperature,
-                    }
-                )
+                    if event_index % 2 == 0:
+                        events.append(("laboratory.smoke", smoke))
+                    else:
+                        events.append(("laboratory.temperature", temperature))
+
+                snapshot = await runtime.update_environment_events(events)
                 await live_connections.broadcast(snapshot)
-                await asyncio.sleep(0.1)
+                next_tick_at += SIMULATION_TICK_SECONDS
+                await asyncio.sleep(max(0, next_tick_at - loop.time()))
         except asyncio.CancelledError:
             raise
         except Exception:

@@ -157,7 +157,7 @@ export class MockRuleMeshSocket {
         }
       }
       this.env = nextEnv;
-      this.accepted += 2;
+      this.accepted += 60;
       this.broadcast();
     }, 100);
   }
@@ -182,7 +182,8 @@ export class MockRuleMeshSocket {
       connected_sessions: this.connectedSessions,
       simulation_running: this.tickHandle !== null,
       perf: {
-        events_per_second: this.tickHandle ? 20 : 0,
+        events_per_second: this.tickHandle ? 600 : 0,
+        target_events_per_second: 500,
         // p50/p95 are NOT measured here — they're overwritten by useRuleMeshSocket
         // with a real client-side render-latency measurement. See that hook.
         p50_latency_ms: 0,

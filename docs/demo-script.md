@@ -72,9 +72,14 @@ The red banner must show a closed cycle path. The rule count must remain `7`.
 Say: “Validation happens before commit. We return the exact path, reject the
 mutation, and preserve the last known-good graph.”
 
-### 3:25–3:50 — Close
+### 3:25–3:55 — Prove the live performance requirement and close
 
-Point to revision, sessions, events/second, latency, execution trace, and graph.
+Press **Reset demo**, start simulation with seed `42`, and wait roughly two
+seconds. Point to the green **SLA PASS** badge: live throughput must be at least
+`500 EPS` and p95 interface latency below `200 ms`. If a second dashboard is
+open, both must show the same revision and seed.
+
+Then point to revision, sessions, execution trace, and graph.
 
 “The prototype combines a graph-safe rule engine, deterministic conflict
 arbitration, atomic backend state, REST commands, and live WebSocket
@@ -87,4 +92,4 @@ factories, energy systems, or fleet automation.”
 - Rule count is not `7`: press **Reset demo** before the cycle test.
 - Header is disconnected: leave the backend terminal running and refresh once.
 - Simulation is changing values: any guided stage automatically stops it.
-- Need a shorter demo: show **Fire**, **Normal**, then **Unsafe cycle**.
+- Need a shorter demo: show **Fire**, **Unsafe cycle**, then the load SLA.

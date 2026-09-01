@@ -16,6 +16,8 @@ from .variables import ACTUATOR_DEFAULTS, SENSOR_DEFAULTS, validate_environment_
 class LiveConnections:
     def __init__(self) -> None:
         self._connections: set[WebSocket] = set()
+        self._broadcast_lock = asyncio.Lock()
+        self._last_broadcast_revision = -1
 
     @property
     def count(self) -> int:
@@ -29,15 +31,23 @@ class LiveConnections:
         self._connections.discard(websocket)
 
     async def broadcast(self, snapshot: Snapshot) -> None:
-        payload = snapshot.model_dump(mode="json")
-        stale: list[WebSocket] = []
-        for websocket in list(self._connections):
-            try:
-                await websocket.send_json(payload)
-            except Exception:
-                stale.append(websocket)
-        for websocket in stale:
-            self.disconnect(websocket)
+        # REST handlers release the runtime lock before broadcasting, so two
+        # simultaneous commands can otherwise send revision N+1 before N.
+        # Serialize broadcasts and discard an already-obsolete snapshot.
+        async with self._broadcast_lock:
+            if snapshot.revision < self._last_broadcast_revision:
+                return
+            self._last_broadcast_revision = snapshot.revision
+
+            payload = snapshot.model_dump(mode="json")
+            stale: list[WebSocket] = []
+            for websocket in list(self._connections):
+                try:
+                    await websocket.send_json(payload)
+                except Exception:
+                    stale.append(websocket)
+            for websocket in stale:
+                self.disconnect(websocket)
 
 
 class RuleNotFoundError(Exception):
@@ -112,12 +122,24 @@ class RuntimeState:
             return self._snapshot()
 
     async def update_environment(self, changes: dict[str, ScalarValue]) -> Snapshot:
-        validate_environment_changes(changes)
+        return await self.update_environment_events(list(changes.items()))
+
+    async def update_environment_events(
+        self,
+        events: list[tuple[str, ScalarValue]],
+    ) -> Snapshot:
+        """Apply an ordered sensor micro-batch as one atomic graph revision."""
+        if not events:
+            raise ValueError("An environment event batch cannot be empty")
+        for variable, value in events:
+            validate_environment_changes({variable: value})
+
         async with self.lock:
-            self.sensor_values.update(changes)
+            for variable, value in events:
+                self.sensor_values[variable] = value
             now = time.monotonic()
-            self.event_times.extend(now for _ in changes)
-            self.accepted_events += len(changes)
+            self.event_times.extend(now for _ in events)
+            self.accepted_events += len(events)
             self._recompute()
             self.revision += 1
             return self._snapshot()
