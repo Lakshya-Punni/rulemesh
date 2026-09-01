@@ -174,23 +174,44 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
     }
 
     let cancelled = false;
-    const ws = new WebSocket(WS_URL!);
-    wsRef.current = ws;
-    setStatus("connecting");
-    ws.onopen = () => !cancelled && setStatus("open");
-    ws.onclose = () => !cancelled && setStatus("closed");
-    ws.onerror = () => !cancelled && setStatus("error");
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data) as BackendSnapshot;
-        if (msg.type === "snapshot") handleBackendSnapshot(msg);
-      } catch {
-        // The next authoritative snapshot repairs the UI after a malformed frame.
-      }
+    let reconnectTimer: number | null = null;
+    let reconnectAttempt = 0;
+
+    const connect = () => {
+      if (cancelled) return;
+      const ws = new WebSocket(WS_URL!);
+      wsRef.current = ws;
+      ws.onopen = () => {
+        if (cancelled) return;
+        reconnectAttempt = 0;
+        setStatus("open");
+      };
+      ws.onclose = () => {
+        if (cancelled) return;
+        setStatus("closed");
+        const delay = Math.min(3000, 250 * 2 ** reconnectAttempt);
+        reconnectAttempt += 1;
+        reconnectTimer = window.setTimeout(() => {
+          setStatus("connecting");
+          connect();
+        }, delay);
+      };
+      ws.onerror = () => !cancelled && setStatus("error");
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data) as BackendSnapshot;
+          if (msg.type === "snapshot") handleBackendSnapshot(msg);
+        } catch {
+          // The next authoritative snapshot repairs the UI after a malformed frame.
+        }
+      };
     };
+
+    connect();
     return () => {
       cancelled = true;
-      ws.close();
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+      wsRef.current?.close();
       if (simulationRef.current !== null) window.clearInterval(simulationRef.current);
     };
   }, [handleBackendSnapshot, handleStateMessage]);
@@ -201,13 +222,40 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
     for (let i = 0; i < count; i += 1) eventTimesRef.current.push(now);
   }, []);
 
+  const sendEnvironmentChanges = useCallback(
+    async (changes: EnvironmentState) => {
+      const eventCount = Object.keys(changes).length;
+      try {
+        const response = await fetch(`${API_URL}/api/environment`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ changes }),
+        });
+        const payload = (await response.json()) as BackendSnapshot | { detail?: string };
+        if (!response.ok) {
+          rejectedEventsRef.current += eventCount;
+          console.error("RuleMesh API rejected an environment update", payload);
+          return;
+        }
+
+        recordAccepted(eventCount);
+        if (wsRef.current?.readyState !== WebSocket.OPEN && "type" in payload && payload.type === "snapshot") {
+          handleBackendSnapshot(payload);
+        }
+      } catch (error) {
+        setStatus("error");
+        console.error("RuleMesh environment update failed", error);
+      }
+    },
+    [handleBackendSnapshot, recordAccepted],
+  );
+
   const sendReal = useCallback(
     async (command: ClientCommand) => {
       let method = "POST";
       let path = "";
       let body: unknown;
       let rejectedRule: RuleDraft | Rule | null = null;
-      let eventCount = 1;
 
       switch (command.type) {
         case "create_rule":
@@ -232,14 +280,11 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
           path = `/api/rules/${encodeURIComponent(command.id)}`;
           break;
         case "set_manual":
-          path = "/api/environment";
-          body = { changes: { [command.variable]: command.value } };
-          break;
+          await sendEnvironmentChanges({ [command.variable]: command.value });
+          return;
         case "reset_environment":
-          path = "/api/environment";
-          body = { changes: RESET_ENVIRONMENT };
-          eventCount = Object.keys(RESET_ENVIRONMENT).length;
-          break;
+          await sendEnvironmentChanges(RESET_ENVIRONMENT);
+          return;
         case "acknowledge_alert":
           return;
       }
@@ -252,7 +297,7 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
         });
         const payload = (await response.json()) as BackendSnapshot | BackendCycleError | { detail?: string };
         if (!response.ok) {
-          rejectedEventsRef.current += eventCount;
+          rejectedEventsRef.current += 1;
           if ("code" in payload && payload.code === "CYCLE_DETECTED") {
             setLastCycleError({
               type: "cycle_error",
@@ -272,7 +317,7 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
           return;
         }
 
-        recordAccepted(eventCount);
+        recordAccepted(1);
         if (wsRef.current?.readyState !== WebSocket.OPEN && "type" in payload && payload.type === "snapshot") {
           handleBackendSnapshot(payload);
         }
@@ -281,7 +326,7 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
         console.error("RuleMesh API request failed", error);
       }
     },
-    [handleBackendSnapshot, recordAccepted],
+    [handleBackendSnapshot, recordAccepted, sendEnvironmentChanges],
   );
 
   const send = useCallback(
@@ -309,14 +354,16 @@ export function useRuleMeshSocket(): UseRuleMeshSocketResult {
         tick += 1;
         const smoke = tick < incidentTick ? Math.round(random() * 8) : Math.min(95, (tick - incidentTick) * 6);
         const temperature = tick < incidentTick ? 24 + random() * 2 : Math.min(45, 26 + (tick - incidentTick) * 1.2);
-        void sendReal({ type: "set_manual", variable: "laboratory.smoke", value: smoke })
-          .then(() => sendReal({ type: "set_manual", variable: "laboratory.temperature", value: temperature }))
+        void sendEnvironmentChanges({
+          "laboratory.smoke": smoke,
+          "laboratory.temperature": temperature,
+        })
           .finally(() => {
             simulationBusyRef.current = false;
           });
       }, 100);
     },
-    [sendReal],
+    [sendEnvironmentChanges],
   );
 
   const stopSimulation = useCallback(() => {

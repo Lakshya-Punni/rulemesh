@@ -39,9 +39,11 @@ Copy-Item .env.example .env.local
 npm run dev -- --host 127.0.0.1
 ```
 
-Open `http://127.0.0.1:5173`, then click **Load starter rules**. The frontend
-uses REST for commands and treats `/ws/live` snapshots as the authoritative
-live state. Set `VITE_USE_MOCK=true` only when the backend is unavailable.
+Open `http://127.0.0.1:5173`. The backend boots with the seven validated Review
+1 starter rules, so the demo is ready immediately after any restart. The
+frontend uses REST for commands and treats `/ws/live` snapshots as the
+authoritative live state. Set `VITE_USE_MOCK=true` only when the backend is
+unavailable.
 
 ## Git workflow
 

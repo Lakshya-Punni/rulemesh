@@ -20,6 +20,15 @@ def test_websocket_receives_initial_snapshot() -> None:
     assert "revision" in snapshot
     assert "state" in snapshot
     assert "graph" in snapshot
+    assert [rule["name"] for rule in snapshot["rules"]] == [
+        "Fire alarm",
+        "Evacuate",
+        "Unlock exits",
+        "Emergency lights",
+        "Smoke shutdown",
+        "Temperature cooling",
+        "Quiet hours",
+    ]
 
 
 def test_environment_update_is_pushed_to_live_session() -> None:

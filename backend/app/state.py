@@ -7,6 +7,7 @@ from fastapi import WebSocket
 from .engine import recompute_state
 from .graph import CycleDetectedError, build_graph_snapshot, validate_acyclic
 from .models import Rule, RuleCreate, RuleUpdate, ScalarValue, Snapshot
+from .starter_rules import starter_rule_creates
 from .variables import ACTUATOR_DEFAULTS, SENSOR_DEFAULTS, validate_environment_changes, validate_rule_create
 
 
@@ -55,6 +56,21 @@ class RuntimeState:
         self.conflicts = []
         self.created_sequence = 0
         self.revision = 0
+        self._load_starter_rules()
+
+    def _load_starter_rules(self) -> None:
+        for rule_create in starter_rule_creates():
+            validate_rule_create(rule_create)
+            next_sequence = self.created_sequence + 1
+            rule = Rule(
+                **rule_create.model_dump(),
+                id=f"rule-{next_sequence}",
+                created_sequence=next_sequence,
+            )
+            validate_acyclic(self.rules, rule)
+            self.rules.append(rule)
+            self.created_sequence = next_sequence
+        self._recompute()
 
     def _recompute(self) -> None:
         self.effective_state, self.active_rule_ids, self.conflicts = recompute_state(
