@@ -193,8 +193,8 @@ export function DependencyGraph({ rules, activeChains, cyclePath }: DependencyGr
             {activeOnly ? "No rules are currently active." : "No rules match this filter."}
           </div>
         ) : (
-          <ReactFlow nodes={nodes} edges={edges} fitView colorMode="dark" nodesDraggable={false} nodesConnectable={false}>
-            <Background gap={24} color="#34332c" />
+          <ReactFlow nodes={nodes} edges={edges} fitView colorMode="light" nodesDraggable={false} nodesConnectable={false}>
+            <Background gap={24} color="#e2e8f0" />
           </ReactFlow>
         )}
       </div>
@@ -209,19 +209,19 @@ function nodeStyle(active: boolean, inCycle: boolean, disabled: boolean, isVar =
     padding: 8,
     borderRadius: 3,
     whiteSpace: "pre-wrap" as const,
-    background: isVar ? "#181814" : "#11110e",
-    color: "#f4f1e7",
-    border: "1px solid #34332c",
+    background: isVar ? "#f8fafc" : "#ffffff",
+    color: "#1f2937",
+    border: "1px solid #e2e8f0",
     width: isVar ? 170 : 190,
     opacity: disabled ? 0.4 : 1,
   };
-  if (inCycle) return { ...base, border: "1.5px solid #ff4f5e", background: "rgba(255,79,94,0.13)" };
-  if (active) return { ...base, border: "1.5px solid #ff5a1f", background: "rgba(255,90,31,0.13)" };
+  if (inCycle) return { ...base, border: "1.5px solid #dc2626", background: "rgba(220,38,38,0.09)" };
+  if (active) return { ...base, border: "1.5px solid #2563eb", background: "rgba(37,99,235,0.1)" };
   return base;
 }
 
 function edgeFor(source: string, target: string, active: boolean, inCycle: boolean): Edge {
-  const color = inCycle ? "#ff4f5e" : active ? "#ff5a1f" : "#45443a";
+  const color = inCycle ? "#dc2626" : active ? "#2563eb" : "#94a3b8";
   return {
     id: `${source}->${target}`,
     source,
